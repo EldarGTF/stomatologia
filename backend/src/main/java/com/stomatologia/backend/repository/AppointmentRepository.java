@@ -57,6 +57,9 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long>,
             """)
     List<Appointment> findActiveBetween(@Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
 
+    long countByStartAtGreaterThanEqualAndStartAtLessThanAndStatus(LocalDateTime from, LocalDateTime to,
+                                                                   com.stomatologia.backend.domain.AppointmentStatus status);
+
     @Override
     @EntityGraph(attributePaths = {"doctor", "doctor.specialty", "room", "service", "patient"})
     List<Appointment> findAll(org.springframework.data.jpa.domain.Specification<Appointment> spec,

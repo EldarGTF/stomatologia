@@ -55,6 +55,19 @@ class SlotCalculatorTest {
     }
 
     @Test
+    void busyMinutesClipsToWorkingHoursAndMergesOverlaps() {
+        List<Interval> busy = List.of(
+                new Interval(at(8, 30), at(9, 30)),
+                new Interval(at(10, 0), at(11, 0)),
+                new Interval(at(10, 30), at(11, 30)),
+                new Interval(at(17, 30), at(18, 30)));
+
+        int minutes = SlotCalculator.busyMinutes(DAY, LocalTime.of(9, 0), LocalTime.of(18, 0), busy);
+
+        assertThat(minutes).isEqualTo(30 + 90 + 30);
+    }
+
+    @Test
     void serviceLongerThanWorkingDayHasNoSlots() {
         List<LocalDateTime> starts = SlotCalculator.freeStarts(DAY, LocalTime.of(9, 0), LocalTime.of(10, 0),
                 90, 15, List.of(), null);

@@ -170,6 +170,66 @@
     -fx-text-fill: -color-text;
 }
 
+.kpi-sub {
+    -fx-text-fill: -color-muted;
+    -fx-font-size: 11px;
+}
+
+.alert-warning {
+    -fx-background-color: -color-warning-soft;
+    -fx-background-radius: 10;
+    -fx-border-color: #fcd34d;
+    -fx-border-radius: 10;
+    -fx-padding: 10 14 10 14;
+    -fx-alignment: center-left;
+}
+
+.alert-warning > .label {
+    -fx-text-fill: #92400e;
+}
+
+/* ---------- Графики и загрузка ---------- */
+
+.revenue-chart .chart-bar {
+    -fx-bar-fill: -color-primary;
+    -fx-background-radius: 4 4 0 0;
+}
+
+.revenue-chart .axis {
+    -fx-tick-label-fill: -color-muted;
+    -fx-tick-label-font-size: 11px;
+    -fx-tick-mark-visible: false;
+}
+
+.revenue-chart .chart-plot-background {
+    -fx-background-color: transparent;
+}
+
+.revenue-chart .chart-vertical-grid-lines {
+    -fx-stroke: transparent;
+}
+
+.revenue-chart .chart-horizontal-grid-lines {
+    -fx-stroke: -color-border;
+}
+
+.progress-bar > .track {
+    -fx-background-color: #e2e8f0;
+    -fx-background-radius: 6;
+    -fx-background-insets: 0;
+}
+
+.progress-bar > .bar {
+    -fx-background-color: -color-primary;
+    -fx-background-radius: 6;
+    -fx-background-insets: 0;
+    -fx-padding: 4;
+}
+
+.progress-bar.load-high > .bar {
+    -fx-background-color: -color-warning;
+}
+
 .kpi-accent {
     -fx-border-color: transparent transparent transparent -color-primary;
     -fx-border-width: 0 0 0 4;

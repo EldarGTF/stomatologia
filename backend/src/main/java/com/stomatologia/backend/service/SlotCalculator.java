@@ -1,9 +1,11 @@
 package com.stomatologia.backend.service;
 
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -43,5 +45,30 @@ public final class SlotCalculator {
             }
         }
         return result;
+    }
+
+    /**
+     * Сколько минут рабочего времени занято интервалами (части интервалов вне рабочего времени не считаются,
+     * пересекающиеся интервалы не учитываются дважды).
+     */
+    public static int busyMinutes(LocalDate date, LocalTime workStart, LocalTime workEnd, List<Interval> busy) {
+        LocalDateTime dayStart = date.atTime(workStart);
+        LocalDateTime dayEnd = date.atTime(workEnd);
+        List<Interval> clipped = busy.stream()
+                .filter(b -> b.overlaps(dayStart, dayEnd))
+                .map(b -> new Interval(b.start().isBefore(dayStart) ? dayStart : b.start(),
+                        b.end().isAfter(dayEnd) ? dayEnd : b.end()))
+                .sorted(Comparator.comparing(Interval::start))
+                .toList();
+        long minutes = 0;
+        LocalDateTime coveredUntil = dayStart;
+        for (Interval b : clipped) {
+            LocalDateTime from = b.start().isAfter(coveredUntil) ? b.start() : coveredUntil;
+            if (b.end().isAfter(from)) {
+                minutes += Duration.between(from, b.end()).toMinutes();
+                coveredUntil = b.end();
+            }
+        }
+        return (int) minutes;
     }
 }
