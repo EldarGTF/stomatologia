@@ -1,0 +1,15 @@
+target/
+*.class
+*.log
+*.iml
+.idea/
+.vscode/
+.cursor/
+out/
+.DS_Store
+Thumbs.db
+
+.env
+.env.*
+!.env.example
+application-local.yml

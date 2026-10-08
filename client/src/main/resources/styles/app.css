@@ -1,0 +1,402 @@
+/* Единая тема клиента «Стоматология CRM» */
+
+.root {
+    -color-primary: #0f766e;
+    -color-primary-hover: #115e59;
+    -color-primary-soft: #ccfbf1;
+    -color-bg: #f1f5f9;
+    -color-surface: #ffffff;
+    -color-border: #e2e8f0;
+    -color-text: #0f172a;
+    -color-muted: #64748b;
+    -color-danger: #dc2626;
+    -color-danger-soft: #fee2e2;
+    -color-warning: #d97706;
+    -color-warning-soft: #fef3c7;
+    -color-success: #16a34a;
+    -color-success-soft: #dcfce7;
+    -color-sidebar: #0b1f2a;
+    -color-sidebar-hover: #12303f;
+
+    -fx-font-family: "Segoe UI", "Inter", "Roboto", sans-serif;
+    -fx-font-size: 13px;
+    -fx-text-fill: -color-text;
+    -fx-background-color: -color-bg;
+    -fx-focus-color: -color-primary;
+    -fx-faint-focus-color: transparent;
+    -fx-accent: -color-primary;
+}
+
+.app-root {
+    -fx-background-color: -color-bg;
+}
+
+/* ---------- Типографика ---------- */
+
+.page-title {
+    -fx-font-size: 22px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -color-text;
+}
+
+.section-title {
+    -fx-font-size: 15px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -color-text;
+}
+
+.muted {
+    -fx-text-fill: -color-muted;
+}
+
+.field-label {
+    -fx-text-fill: -color-muted;
+    -fx-font-size: 12px;
+}
+
+/* ---------- Экран входа ---------- */
+
+.login-root {
+    -fx-background-color: linear-gradient(to bottom right, #0b1f2a, #0f766e);
+}
+
+.login-card {
+    -fx-background-color: -color-surface;
+    -fx-background-radius: 16;
+    -fx-padding: 36 40 36 40;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.25), 30, 0.2, 0, 8);
+}
+
+.login-logo {
+    -fx-font-size: 30px;
+    -fx-text-fill: -color-primary;
+    -fx-font-weight: bold;
+}
+
+/* ---------- Боковое меню ---------- */
+
+.sidebar {
+    -fx-background-color: -color-sidebar;
+    -fx-padding: 20 12 20 12;
+    -fx-spacing: 4;
+    -fx-pref-width: 230;
+}
+
+.sidebar-brand {
+    -fx-text-fill: white;
+    -fx-font-size: 18px;
+    -fx-font-weight: bold;
+    -fx-padding: 0 8 2 8;
+}
+
+.sidebar-caption {
+    -fx-text-fill: #7dd3c8;
+    -fx-font-size: 11px;
+    -fx-padding: 0 8 16 8;
+}
+
+.nav-button {
+    -fx-background-color: transparent;
+    -fx-text-fill: #cbd5e1;
+    -fx-alignment: center-left;
+    -fx-padding: 10 14 10 14;
+    -fx-background-radius: 8;
+    -fx-font-size: 13px;
+    -fx-cursor: hand;
+    -fx-max-width: infinity;
+}
+
+.nav-button:hover {
+    -fx-background-color: -color-sidebar-hover;
+    -fx-text-fill: white;
+}
+
+.nav-button.active {
+    -fx-background-color: -color-primary;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+}
+
+.sidebar-user {
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-padding: 0 8 0 8;
+}
+
+.sidebar-role {
+    -fx-text-fill: #94a3b8;
+    -fx-font-size: 11px;
+    -fx-padding: 0 8 8 8;
+}
+
+/* ---------- Контент ---------- */
+
+.content {
+    -fx-padding: 24 28 24 28;
+    -fx-spacing: 16;
+}
+
+.card {
+    -fx-background-color: -color-surface;
+    -fx-background-radius: 12;
+    -fx-border-color: -color-border;
+    -fx-border-radius: 12;
+    -fx-padding: 16;
+}
+
+.kpi-card {
+    -fx-background-color: -color-surface;
+    -fx-background-radius: 12;
+    -fx-border-color: -color-border;
+    -fx-border-radius: 12;
+    -fx-padding: 16 18 16 18;
+    -fx-spacing: 6;
+    -fx-min-width: 200;
+}
+
+.kpi-title {
+    -fx-text-fill: -color-muted;
+    -fx-font-size: 12px;
+}
+
+.kpi-value {
+    -fx-font-size: 26px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -color-text;
+}
+
+.kpi-accent {
+    -fx-border-color: transparent transparent transparent -color-primary;
+    -fx-border-width: 0 0 0 4;
+}
+
+.toolbar {
+    -fx-spacing: 8;
+    -fx-alignment: center-left;
+}
+
+/* ---------- Кнопки ---------- */
+
+.button {
+    -fx-background-radius: 8;
+    -fx-padding: 8 14 8 14;
+    -fx-cursor: hand;
+    -fx-background-color: -color-surface;
+    -fx-border-color: -color-border;
+    -fx-border-radius: 8;
+    -fx-text-fill: -color-text;
+}
+
+.button:hover {
+    -fx-background-color: #f8fafc;
+}
+
+.button.primary {
+    -fx-background-color: -color-primary;
+    -fx-border-color: -color-primary;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+}
+
+.button.primary:hover {
+    -fx-background-color: -color-primary-hover;
+}
+
+.button.danger {
+    -fx-background-color: -color-surface;
+    -fx-border-color: -color-danger;
+    -fx-text-fill: -color-danger;
+}
+
+.button.danger:hover {
+    -fx-background-color: -color-danger-soft;
+}
+
+.button:disabled {
+    -fx-opacity: 0.5;
+}
+
+/* ---------- Поля ввода ---------- */
+
+.text-field, .password-field, .combo-box, .date-picker, .text-area, .spinner {
+    -fx-background-radius: 8;
+    -fx-border-radius: 8;
+    -fx-border-color: -color-border;
+    -fx-background-color: -color-surface;
+}
+
+.text-field, .password-field {
+    -fx-padding: 8 10 8 10;
+}
+
+.text-field:focused, .password-field:focused, .combo-box:focused, .date-picker:focused, .text-area:focused {
+    -fx-border-color: -color-primary;
+}
+
+.search-field {
+    -fx-pref-width: 260;
+}
+
+.error-label {
+    -fx-text-fill: -color-danger;
+}
+
+/* ---------- Таблицы ---------- */
+
+.table-view {
+    -fx-background-color: -color-surface;
+    -fx-background-radius: 12;
+    -fx-border-color: -color-border;
+    -fx-border-radius: 12;
+    -fx-padding: 4;
+}
+
+.table-view .column-header-background {
+    -fx-background-color: #f8fafc;
+    -fx-background-radius: 10 10 0 0;
+}
+
+.table-view .column-header, .table-view .filler {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent transparent -color-border transparent;
+    -fx-size: 36;
+}
+
+.table-view .column-header .label {
+    -fx-text-fill: -color-muted;
+    -fx-font-weight: bold;
+    -fx-alignment: center-left;
+}
+
+.table-row-cell {
+    -fx-background-color: -color-surface;
+    -fx-cell-size: 34;
+    -fx-border-color: transparent transparent #f1f5f9 transparent;
+}
+
+.table-row-cell:odd {
+    -fx-background-color: #fbfdfe;
+}
+
+.table-row-cell:hover {
+    -fx-background-color: #f0fdfa;
+}
+
+.table-row-cell:selected {
+    -fx-background-color: -color-primary-soft;
+}
+
+.table-row-cell:selected .text {
+    -fx-fill: -color-text;
+}
+
+.table-view .placeholder .label {
+    -fx-text-fill: -color-muted;
+}
+
+/* ---------- Статусы ---------- */
+
+.badge {
+    -fx-padding: 2 10 2 10;
+    -fx-background-radius: 999;
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+}
+
+.badge-success {
+    -fx-background-color: -color-success-soft;
+    -fx-text-fill: -color-success;
+}
+
+.badge-warning {
+    -fx-background-color: -color-warning-soft;
+    -fx-text-fill: -color-warning;
+}
+
+.badge-danger {
+    -fx-background-color: -color-danger-soft;
+    -fx-text-fill: -color-danger;
+}
+
+.badge-info {
+    -fx-background-color: -color-primary-soft;
+    -fx-text-fill: -color-primary;
+}
+
+.badge-muted {
+    -fx-background-color: #e2e8f0;
+    -fx-text-fill: -color-muted;
+}
+
+/* ---------- Диалоги ---------- */
+
+.dialog-pane {
+    -fx-background-color: -color-surface;
+}
+
+.dialog-pane > .header-panel {
+    -fx-background-color: #f8fafc;
+    -fx-border-color: transparent transparent -color-border transparent;
+}
+
+.dialog-pane > .header-panel > .label {
+    -fx-font-size: 15px;
+    -fx-font-weight: bold;
+}
+
+.dialog-pane > .content {
+    -fx-padding: 16 20 8 20;
+}
+
+/* ---------- Расписание ---------- */
+
+.schedule-grid {
+    -fx-hgap: 1;
+    -fx-vgap: 1;
+    -fx-background-color: -color-border;
+    -fx-border-color: -color-border;
+}
+
+.schedule-header {
+    -fx-background-color: #f8fafc;
+    -fx-padding: 10;
+    -fx-font-weight: bold;
+    -fx-text-fill: -color-muted;
+}
+
+.schedule-cell {
+    -fx-background-color: -color-surface;
+    -fx-padding: 10;
+    -fx-min-height: 48;
+}
+
+.schedule-cell-work {
+    -fx-background-color: #f0fdfa;
+    -fx-text-fill: -color-primary;
+    -fx-font-weight: bold;
+}
+
+.schedule-cell-off {
+    -fx-text-fill: #94a3b8;
+}
+
+/* ---------- Слоты записи ---------- */
+
+.slot-button {
+    -fx-min-width: 72;
+}
+
+.slot-button:selected, .slot-button.selected {
+    -fx-background-color: -color-primary;
+    -fx-text-fill: white;
+    -fx-border-color: -color-primary;
+}
+
+.scroll-pane {
+    -fx-background-color: transparent;
+    -fx-background: transparent;
+}
+
+.scroll-pane > .viewport {
+    -fx-background-color: transparent;
+}
