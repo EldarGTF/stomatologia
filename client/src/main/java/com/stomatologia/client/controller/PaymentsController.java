@@ -98,6 +98,9 @@ public class PaymentsController {
         sorted.comparatorProperty().bind(table.comparatorProperty());
         table.setItems(sorted);
 
+        if (patientMode) {
+            searchField.setPromptText("Номер счёта");
+        }
         payButton.setVisible(staff);
         payButton.setManaged(staff);
         cancelButton.setVisible(admin);

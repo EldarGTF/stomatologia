@@ -84,6 +84,7 @@ public class BookingForm extends VBox {
             patientSearch.setPromptText("Поиск по ФИО или телефону");
             patientSearch.textProperty().addListener((obs, o, n) -> filterPatients(n));
             patientCombo.setPromptText("Выберите пациента");
+            patientCombo.setMaxWidth(Double.MAX_VALUE);
             grid.addRow(row++, label("Пациент *"), stretch(new VBox(6, patientSearch, patientCombo)));
         }
         specialtyCombo.setPromptText("Все специальности");
