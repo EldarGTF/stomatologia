@@ -122,7 +122,8 @@ public class DemoVisitsInitializer implements ApplicationRunner {
                     a.setEndAt(end);
                     a.setStatus(status(end.isBefore(now), random));
                     a.setCreatedBy(registrar);
-                    a.setCreatedAt(start.minusDays(3 + random.nextInt(5)));
+                    LocalDateTime createdAt = start.minusDays(3 + random.nextInt(5));
+                    a.setCreatedAt(createdAt.isAfter(now) ? now.minusHours(1 + random.nextInt(48)) : createdAt);
                     appointments.save(a);
                     byPatient.computeIfAbsent(patient.getId(), k -> new ArrayList<>()).add(a);
                     log(a, AuditAction.CREATE, registrar);

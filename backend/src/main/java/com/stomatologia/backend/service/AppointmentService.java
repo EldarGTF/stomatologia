@@ -50,10 +50,11 @@ public class AppointmentService {
     private final ScheduleRepository schedules;
     private final UserRepository users;
     private final ServiceCatalogService catalog;
+    private final InvoiceService invoices;
 
     public AppointmentService(AppointmentRepository appointments, AppointmentAuditRepository audit,
                               DoctorRepository doctors, PatientRepository patients, ScheduleRepository schedules,
-                              UserRepository users, ServiceCatalogService catalog) {
+                              UserRepository users, ServiceCatalogService catalog, InvoiceService invoices) {
         this.appointments = appointments;
         this.audit = audit;
         this.doctors = doctors;
@@ -61,6 +62,7 @@ public class AppointmentService {
         this.schedules = schedules;
         this.users = users;
         this.catalog = catalog;
+        this.invoices = invoices;
     }
 
     public record Filter(LocalDate from, LocalDate to, Long doctorId, Long patientId, AppointmentStatus status) {
@@ -142,8 +144,9 @@ public class AppointmentService {
         requireScheduled(a, "изменить");
 
         String before = describe(a);
-        boolean timeChanged = !a.getStartAt().equals(r.startAt()) || !a.getDoctor().getId().equals(r.doctorId())
-                || !a.getService().getId().equals(r.serviceId());
+        boolean serviceChanged = !a.getService().getId().equals(r.serviceId());
+        boolean timeChanged = serviceChanged || !a.getStartAt().equals(r.startAt())
+                || !a.getDoctor().getId().equals(r.doctorId());
 
         Doctor doctor = findDoctor(r.doctorId());
         ClinicService service = a.getService().getId().equals(r.serviceId()) ? a.getService()
@@ -166,6 +169,9 @@ public class AppointmentService {
         a.setEndAt(r.startAt().plusMinutes(service.getDurationMinutes()));
         a.setNotes(trimToNull(r.notes()));
         appointments.saveAndFlush(a);
+        if (serviceChanged) {
+            invoices.onServiceChanged(a);
+        }
 
         String after = describe(a);
         if (!before.equals(after) || timeChanged) {
@@ -185,6 +191,7 @@ public class AppointmentService {
         requireScheduled(a, "отменить");
         a.setStatus(AppointmentStatus.CANCELLED);
         appointments.saveAndFlush(a);
+        invoices.onClosedWithoutVisit(a);
         String why = trimToNull(reason);
         log(a, AuditAction.CANCEL, AppointmentStatus.SCHEDULED.title(),
                 AppointmentStatus.CANCELLED.title() + (why != null ? ". Причина: " + why : ""), me);
@@ -208,6 +215,11 @@ public class AppointmentService {
         AppointmentStatus old = a.getStatus();
         a.setStatus(status);
         appointments.saveAndFlush(a);
+        if (status == AppointmentStatus.COMPLETED) {
+            invoices.onCompleted(a);
+        } else {
+            invoices.onClosedWithoutVisit(a);
+        }
         log(a, AuditAction.STATUS, old.title(), status.title(), me);
         return AppointmentDto.from(a);
     }

@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.DatePicker?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.VBox?>
+
+<VBox xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="com.stomatologia.client.controller.PaymentsController"
+      styleClass="content">
+    <HBox styleClass="toolbar">
+        <VBox>
+            <Label fx:id="titleLabel" text="Оплата" styleClass="page-title"/>
+            <Label fx:id="countLabel" styleClass="muted"/>
+        </VBox>
+        <Region HBox.hgrow="ALWAYS"/>
+        <Button fx:id="payButton" text="Принять оплату" styleClass="primary" onAction="#onPay"/>
+        <Button fx:id="detailsButton" text="Подробнее" onAction="#onDetails"/>
+        <Button fx:id="cancelButton" text="Аннулировать" styleClass="danger" onAction="#onCancel"/>
+    </HBox>
+    <HBox spacing="12">
+        <VBox styleClass="kpi-card,kpi-accent" HBox.hgrow="ALWAYS">
+            <Label text="Выставлено счетов" styleClass="kpi-title"/>
+            <Label fx:id="issuedLabel" styleClass="kpi-value"/>
+        </VBox>
+        <VBox styleClass="kpi-card,kpi-accent" HBox.hgrow="ALWAYS">
+            <Label text="Оплачено" styleClass="kpi-title"/>
+            <Label fx:id="paidLabel" styleClass="kpi-value"/>
+        </VBox>
+        <VBox styleClass="kpi-card,kpi-accent" HBox.hgrow="ALWAYS">
+            <Label text="Задолженность" styleClass="kpi-title"/>
+            <Label fx:id="dueLabel" styleClass="kpi-value"/>
+        </VBox>
+    </HBox>
+    <HBox styleClass="toolbar">
+        <Label text="Дата счёта" styleClass="field-label" minWidth="-Infinity"/>
+        <DatePicker fx:id="fromPicker" prefWidth="140" minWidth="140"/>
+        <Label text="—"/>
+        <DatePicker fx:id="toPicker" prefWidth="140" minWidth="140"/>
+        <ComboBox fx:id="statusFilter" prefWidth="190"/>
+        <TextField fx:id="searchField" promptText="Пациент или номер счёта" styleClass="search-field"/>
+        <Region HBox.hgrow="ALWAYS"/>
+        <Button text="Обновить" onAction="#onRefresh" minWidth="-Infinity"/>
+    </HBox>
+    <TableView fx:id="table" VBox.vgrow="ALWAYS"/>
+</VBox>

@@ -4,6 +4,8 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.stomatologia.client.api.ApiClient;
 import com.stomatologia.client.api.Session;
 import com.stomatologia.client.dialog.AppointmentDialogs;
+import com.stomatologia.client.dialog.InvoiceDialogs;
+import com.stomatologia.client.model.InvoiceModels.InvoiceDto;
 import com.stomatologia.client.model.AppointmentModels.AppointmentDto;
 import com.stomatologia.client.model.AppointmentModels.AppointmentStatus;
 import com.stomatologia.client.model.AppointmentModels.StatusRequest;
@@ -64,6 +66,8 @@ public class AppointmentsController {
     private Button noShowButton;
     @FXML
     private Button historyButton;
+    @FXML
+    private Button invoiceButton;
 
     private final ObservableList<AppointmentDto> appointments = FXCollections.observableArrayList();
     private final FilteredList<AppointmentDto> filtered = new FilteredList<>(appointments);
@@ -101,6 +105,7 @@ public class AppointmentsController {
         show(cancelButton, canBook);
         show(completeButton, canMark);
         show(noShowButton, canMark);
+        show(invoiceButton, staff);
         if (role == Role.PATIENT) {
             addButton.setText("Записаться");
         }
@@ -220,6 +225,8 @@ public class AppointmentsController {
         completeButton.setDisable(!scheduled || !a.started());
         noShowButton.setDisable(!scheduled || !a.started());
         historyButton.setDisable(a == null);
+        invoiceButton.setDisable(a == null || a.status() == AppointmentStatus.CANCELLED
+                || a.status() == AppointmentStatus.NO_SHOW);
         if (a == null) {
             hintLabel.setText("Выберите приём в таблице. Двойной щелчок — история изменений.");
         } else if (scheduled && !a.started()) {
@@ -299,7 +306,35 @@ public class AppointmentsController {
             return;
         }
         Fx.run(() -> ApiClient.get().post("/api/appointments/" + a.id() + "/status", new StatusRequest(status),
-                AppointmentDto.class), this::load);
+                AppointmentDto.class), () -> {
+            load();
+            if (status == AppointmentStatus.COMPLETED && Session.hasRole(Role.ADMIN, Role.REGISTRAR)
+                    && Dialogs.confirm("Приём завершён, счёт выставлен. Принять оплату сейчас?")) {
+                openInvoice(a);
+            }
+        });
+    }
+
+    /**
+     * Открывает счёт приёма (выставляет его, если счёта ещё нет) и предлагает принять оплату.
+     */
+    @FXML
+    private void onInvoice() {
+        AppointmentDto a = selected();
+        if (a != null) {
+            openInvoice(a);
+        }
+    }
+
+    private void openInvoice(AppointmentDto a) {
+        Fx.async(() -> ApiClient.get().post("/api/invoices/for-appointment/" + a.id(), null, InvoiceDto.class),
+                invoice -> {
+                    if (invoice.payable()) {
+                        InvoiceDialogs.pay(invoice);
+                    } else {
+                        InvoiceDialogs.details(invoice);
+                    }
+                });
     }
 
     @FXML
