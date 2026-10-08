@@ -29,8 +29,8 @@ app:
   demo-data: ${DEMO_DATA:true}
   slot-step-minutes: 15
   clinic-name: ${CLINIC_NAME:Стоматологическая клиника «Улыбка»}
-  clinic-address: ${CLINIC_ADDRESS:г. Казань, ул. Центральная, д. 1}
-  clinic-phone: ${CLINIC_PHONE:+7 (900) 000-00-00}
+  clinic-address: ${CLINIC_ADDRESS:г. Павлодар, ул. Сатпаева, д. 1}
+  clinic-phone: ${CLINIC_PHONE:+7 (7182) 00-00-00}
 
 management:
   endpoints:

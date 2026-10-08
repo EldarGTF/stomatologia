@@ -82,9 +82,9 @@ public class PaymentsController {
             Tables.text(table, "Пациент", InvoiceDto::patientName, 200);
         }
         Tables.text(table, "Услуга", InvoiceDto::serviceName, 180);
-        Tables.sorted(table, "Сумма", InvoiceDto::amount, Formats::money, 95);
-        Tables.sorted(table, "Оплачено", InvoiceDto::paidAmount, Formats::money, 95);
-        Tables.sorted(table, "Остаток", InvoiceDto::dueAmount, Formats::money, 95);
+        Tables.sorted(table, "Сумма", InvoiceDto::amount, Formats::money, 100).setMinWidth(90);
+        Tables.sorted(table, "Оплачено", InvoiceDto::paidAmount, Formats::money, 100).setMinWidth(90);
+        Tables.sorted(table, "Остаток", InvoiceDto::dueAmount, Formats::money, 100).setMinWidth(90);
         Tables.badge(table, "Статус", i -> i.status().title(), i -> i.status().styleClass(), 140).setMinWidth(135);
         Tables.init(table, "Счетов за выбранный период нет");
         Tables.onDoubleClick(table, i -> {

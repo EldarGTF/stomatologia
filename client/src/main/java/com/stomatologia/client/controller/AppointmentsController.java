@@ -92,9 +92,9 @@ public class AppointmentsController {
         if (role != Role.DOCTOR) {
             Tables.text(table, "Врач", AppointmentDto::doctorName, 190);
         }
-        Tables.text(table, "Каб.", AppointmentDto::roomNumber, 50);
+        Tables.text(table, "Каб.", AppointmentDto::roomNumber, 50).setMinWidth(45);
         Tables.text(table, "Услуга", AppointmentDto::serviceName, 190);
-        Tables.sorted(table, "Стоимость", a -> a.price() == null ? BigDecimal.ZERO : a.price(), Formats::money, 90);
+        Tables.sorted(table, "Стоимость", a -> a.price() == null ? BigDecimal.ZERO : a.price(), Formats::money, 100).setMinWidth(95);
         Tables.badge(table, "Статус", a -> a.status().title(), a -> a.status().styleClass(), 130).setMinWidth(125);
         Tables.text(table, "Комментарий", AppointmentDto::notes, 150);
         Tables.init(table, "Приёмов за выбранный период нет");
