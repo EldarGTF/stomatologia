@@ -109,7 +109,7 @@ public class InvoiceService {
             throw ApiException.conflict("Счёт " + invoice.getNumber() + " уже полностью оплачен");
         }
         if (r.amount().compareTo(due) > 0) {
-            throw ApiException.badRequest("Сумма оплаты больше остатка по счёту (" + due.toPlainString() + " ₽)");
+            throw ApiException.badRequest("Сумма оплаты больше остатка по счёту (" + due.toPlainString() + " ₸)");
         }
         Payment payment = new Payment();
         payment.setInvoice(invoice);

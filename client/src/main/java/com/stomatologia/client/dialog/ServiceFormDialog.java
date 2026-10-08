@@ -25,7 +25,7 @@ public final class ServiceFormDialog {
         TextArea description = form.add("Описание", new TextArea());
         description.setPrefRowCount(3);
         description.setWrapText(true);
-        TextField price = form.add("Стоимость, ₽ *", new TextField());
+        TextField price = form.add("Стоимость, ₸ *", new TextField());
         price.setPromptText("например, 4500");
         Spinner<Integer> duration = form.add("Длительность, мин *", new Spinner<>(5, 480, 30, 5));
         duration.setEditable(true);

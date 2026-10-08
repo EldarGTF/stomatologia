@@ -91,14 +91,14 @@ class ReportGeneratorsTest {
         String text = text(word.ticket(appointment(), "Козлова Марина"));
 
         assertThat(text).contains("ТАЛОН НА ПРИЁМ № 000042", "Алексеев Игорь", "Иванова Елена Петровна",
-                "05.10.2026 10:00–11:00", "№ 101", "Лечение кариеса", "5 500,00 ₽", "Козлова Марина");
+                "05.10.2026 10:00–11:00", "№ 101", "Лечение кариеса", "5 500,00 ₸", "Козлова Марина");
     }
 
     @Test
     void invoiceContainsAmountInWordsAndPayments() throws IOException {
         String text = text(word.invoice(paidInvoice(appointment()), "Козлова Марина"));
 
-        assertThat(text).contains("СЧЁТ № СЧ-20261005-000042", "Пять тысяч пятьсот рублей 00 копеек",
+        assertThat(text).contains("СЧЁТ № СЧ-20261005-000042", "Пять тысяч пятьсот тенге 00 тиын",
                 "Оплачен", "Банковская карта");
     }
 

@@ -28,7 +28,7 @@ public final class InvoiceDialogs {
         form.dialog().setHeaderText("Счёт " + invoice.number() + " — " + invoice.patientName());
         summary(form, invoice);
         form.section("Оплата");
-        TextField amount = form.add("Сумма, ₽ *", new TextField(invoice.dueAmount().stripTrailingZeros().toPlainString()));
+        TextField amount = form.add("Сумма, ₸ *", new TextField(invoice.dueAmount().stripTrailingZeros().toPlainString()));
         ComboBox<PaymentMethod> method = form.add("Способ оплаты *", new ComboBox<>());
         method.getItems().setAll(PaymentMethod.values());
         method.setValue(PaymentMethod.CARD);

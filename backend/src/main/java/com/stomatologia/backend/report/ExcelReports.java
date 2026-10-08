@@ -318,7 +318,7 @@ public class ExcelReports {
 
             short fmtInteger = wb.createDataFormat().getFormat("0");
             short fmtDecimal = wb.createDataFormat().getFormat("0.0");
-            short fmtMoney = wb.createDataFormat().getFormat("#,##0.00 \"₽\"");
+            short fmtMoney = wb.createDataFormat().getFormat("#,##0.00 \"₸\"");
             short fmtPercent = wb.createDataFormat().getFormat("0%");
 
             text = bordered(wb);

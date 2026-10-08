@@ -43,7 +43,7 @@ public final class Formats {
     }
 
     public static String money(BigDecimal amount) {
-        return amount == null ? "" : MONEY.format(amount) + " ₽";
+        return amount == null ? "" : MONEY.format(amount) + " ₸";
     }
 
     public static String dayShort(int dayOfWeek) {

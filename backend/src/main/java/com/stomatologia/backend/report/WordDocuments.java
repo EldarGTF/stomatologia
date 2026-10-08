@@ -119,7 +119,7 @@ public class WordDocuments {
             cell(total.getCell(4), money(invoice.getAmount()), true);
 
             paragraph(doc, "", 6, false, ParagraphAlignment.LEFT);
-            labelValue(doc, "Сумма прописью: ", MoneyInWords.rubles(invoice.getAmount()));
+            labelValue(doc, "Сумма прописью: ", MoneyInWords.tenge(invoice.getAmount()));
             labelValue(doc, "Оплачено: ", money(invoice.paidAmount()));
             labelValue(doc, "К оплате: ", money(invoice.dueAmount()));
             labelValue(doc, "Статус счёта: ", invoice.getStatus().title());
@@ -197,7 +197,7 @@ public class WordDocuments {
         DecimalFormatSymbols symbols = new DecimalFormatSymbols(Locale.forLanguageTag("ru-RU"));
         symbols.setGroupingSeparator(' ');
         symbols.setDecimalSeparator(',');
-        return new DecimalFormat("#,##0.00", symbols).format(amount) + " ₽";
+        return new DecimalFormat("#,##0.00", symbols).format(amount) + " ₸";
     }
 
     private static String orDash(String s) {

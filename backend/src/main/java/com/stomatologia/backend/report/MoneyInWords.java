@@ -4,7 +4,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 
 /**
- * Сумма прописью для счетов: «Пять тысяч пятьсот рублей 00 копеек».
+ * Сумма прописью для счетов: «Пять тысяч пятьсот тенге 00 тиын».
  */
 public final class MoneyInWords {
 
@@ -22,24 +22,24 @@ public final class MoneyInWords {
     private MoneyInWords() {
     }
 
-    public static String rubles(BigDecimal amount) {
+    /** «Тенге» и «тиын» в русском языке не склоняются. */
+    public static String tenge(BigDecimal amount) {
         BigDecimal value = amount.setScale(2, RoundingMode.HALF_UP);
-        long rubles = value.longValue();
-        int kopecks = value.remainder(BigDecimal.ONE).movePointRight(2).abs().intValue();
+        long tenge = value.longValue();
+        int tiyn = value.remainder(BigDecimal.ONE).movePointRight(2).abs().intValue();
 
         StringBuilder sb = new StringBuilder();
-        if (rubles == 0) {
+        if (tenge == 0) {
             sb.append("ноль");
         } else {
-            appendGroup(sb, rubles / 1_000_000_000 % 1000, false, "миллиард", "миллиарда", "миллиардов");
-            appendGroup(sb, rubles / 1_000_000 % 1000, false, "миллион", "миллиона", "миллионов");
-            appendGroup(sb, rubles / 1000 % 1000, true, "тысяча", "тысячи", "тысяч");
-            appendGroup(sb, rubles % 1000, false, "", "", "");
+            appendGroup(sb, tenge / 1_000_000_000 % 1000, false, "миллиард", "миллиарда", "миллиардов");
+            appendGroup(sb, tenge / 1_000_000 % 1000, false, "миллион", "миллиона", "миллионов");
+            appendGroup(sb, tenge / 1000 % 1000, true, "тысяча", "тысячи", "тысяч");
+            appendGroup(sb, tenge % 1000, false, "", "", "");
         }
         String words = sb.toString().trim().replaceAll("\\s+", " ");
-        return Character.toUpperCase(words.charAt(0)) + words.substring(1) + " "
-                + plural(rubles, "рубль", "рубля", "рублей") + " "
-                + String.format("%02d", kopecks) + " " + plural(kopecks, "копейка", "копейки", "копеек");
+        return Character.toUpperCase(words.charAt(0)) + words.substring(1) + " тенге "
+                + String.format("%02d", tiyn) + " тиын";
     }
 
     private static void appendGroup(StringBuilder sb, long n, boolean female, String one, String few, String many) {
