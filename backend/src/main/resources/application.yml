@@ -22,6 +22,14 @@ spring:
     serialization:
       write-dates-as-timestamps: false
 
+app:
+  jwt:
+    secret: ${JWT_SECRET:dev-only-secret-key-change-me-0123456789abcdef}
+    expiration-hours: 8
+  demo-data: ${DEMO_DATA:true}
+  slot-step-minutes: 15
+  clinic-name: Стоматологическая клиника «Улыбка»
+
 management:
   endpoints:
     web:
