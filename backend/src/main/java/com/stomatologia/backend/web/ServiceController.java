@@ -1,8 +1,8 @@
 package com.stomatologia.backend.web;
 
-import com.stomatologia.backend.dto.RoomDtos.RoomDto;
-import com.stomatologia.backend.dto.RoomDtos.RoomRequest;
-import com.stomatologia.backend.service.ReferenceService;
+import com.stomatologia.backend.dto.ServiceDtos.ServiceDto;
+import com.stomatologia.backend.dto.ServiceDtos.ServiceRequest;
+import com.stomatologia.backend.service.ServiceCatalogService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -13,43 +13,44 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/rooms")
-public class RoomController {
+@RequestMapping("/api/services")
+public class ServiceController {
 
-    private final ReferenceService references;
+    private final ServiceCatalogService catalog;
 
-    public RoomController(ReferenceService references) {
-        this.references = references;
+    public ServiceController(ServiceCatalogService catalog) {
+        this.catalog = catalog;
     }
 
     @GetMapping
-    public List<RoomDto> findAll() {
-        return references.rooms();
+    public List<ServiceDto> findAll(@RequestParam(defaultValue = "false") boolean active) {
+        return catalog.findAll(active);
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasRole('ADMIN')")
-    public RoomDto create(@Valid @RequestBody RoomRequest request) {
-        return references.saveRoom(null, request);
+    public ServiceDto create(@Valid @RequestBody ServiceRequest request) {
+        return catalog.create(request);
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public RoomDto update(@PathVariable Long id, @Valid @RequestBody RoomRequest request) {
-        return references.saveRoom(id, request);
+    public ServiceDto update(@PathVariable Long id, @Valid @RequestBody ServiceRequest request) {
+        return catalog.update(id, request);
     }
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("hasRole('ADMIN')")
     public void delete(@PathVariable Long id) {
-        references.deleteRoom(id);
+        catalog.delete(id);
     }
 }

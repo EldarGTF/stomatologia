@@ -27,6 +27,10 @@
     -fx-accent: -color-primary;
 }
 
+.label {
+    -fx-text-fill: -color-text;
+}
+
 .app-root {
     -fx-background-color: -color-bg;
 }
@@ -379,6 +383,15 @@
 
 .schedule-cell-off {
     -fx-text-fill: #94a3b8;
+}
+
+.schedule-doctor {
+    -fx-text-fill: -color-text;
+    -fx-font-weight: bold;
+}
+
+.schedule-today {
+    -fx-text-fill: -color-primary;
 }
 
 /* ---------- Слоты записи ---------- */

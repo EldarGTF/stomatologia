@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.VBox?>
+
+<VBox xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="com.stomatologia.client.controller.PatientsController"
+      styleClass="content">
+    <HBox styleClass="toolbar">
+        <VBox>
+            <Label text="Пациенты" styleClass="page-title"/>
+            <Label fx:id="countLabel" styleClass="muted"/>
+        </VBox>
+        <Region HBox.hgrow="ALWAYS"/>
+        <Button fx:id="addButton" text="Добавить" styleClass="primary" onAction="#onAdd"/>
+        <Button fx:id="editButton" text="Изменить" onAction="#onEdit"/>
+        <Button fx:id="deleteButton" text="Удалить" styleClass="danger" onAction="#onDelete"/>
+    </HBox>
+    <HBox styleClass="toolbar">
+        <TextField fx:id="searchField" promptText="Поиск по ФИО или телефону" styleClass="search-field"/>
+        <Button text="Карточка пациента" fx:id="cardButton" onAction="#onCard"/>
+        <Region HBox.hgrow="ALWAYS"/>
+        <Button text="Обновить" onAction="#onRefresh"/>
+    </HBox>
+    <TableView fx:id="table" VBox.vgrow="ALWAYS"/>
+</VBox>

@@ -38,4 +38,9 @@ public final class DoctorDtos {
 
     public record SpecialtyDto(Long id, String name) {
     }
+
+    public record SpecialtyRequest(
+            @NotBlank(message = "Укажите название специальности") @Size(max = 100, message = "Название слишком длинное")
+            String name) {
+    }
 }

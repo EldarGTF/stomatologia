@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.layout.GridPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.VBox?>
+
+<VBox xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="com.stomatologia.client.controller.ScheduleController"
+      styleClass="content">
+    <HBox styleClass="toolbar">
+        <VBox>
+            <Label text="Расписание" styleClass="page-title"/>
+            <Label fx:id="hintLabel" styleClass="muted"/>
+        </VBox>
+        <Region HBox.hgrow="ALWAYS"/>
+        <ComboBox fx:id="specialtyFilter" prefWidth="220"/>
+    </HBox>
+    <HBox styleClass="toolbar">
+        <Button text="‹ Пред. неделя" onAction="#onPrevWeek"/>
+        <Button text="Текущая неделя" onAction="#onThisWeek"/>
+        <Button text="След. неделя ›" onAction="#onNextWeek"/>
+        <Label fx:id="weekLabel" styleClass="section-title"/>
+        <Region HBox.hgrow="ALWAYS"/>
+        <Button text="Обновить" onAction="#onRefresh"/>
+    </HBox>
+    <ScrollPane fitToWidth="true" VBox.vgrow="ALWAYS">
+        <GridPane fx:id="grid" styleClass="schedule-grid"/>
+    </ScrollPane>
+</VBox>

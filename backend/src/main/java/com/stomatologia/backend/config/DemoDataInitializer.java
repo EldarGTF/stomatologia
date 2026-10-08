@@ -3,10 +3,12 @@ package com.stomatologia.backend.config;
 import com.stomatologia.backend.domain.Doctor;
 import com.stomatologia.backend.domain.Patient;
 import com.stomatologia.backend.domain.Role;
+import com.stomatologia.backend.domain.Schedule;
 import com.stomatologia.backend.domain.User;
 import com.stomatologia.backend.repository.DoctorRepository;
 import com.stomatologia.backend.repository.PatientRepository;
 import com.stomatologia.backend.repository.RoomRepository;
+import com.stomatologia.backend.repository.ScheduleRepository;
 import com.stomatologia.backend.repository.SpecialtyRepository;
 import com.stomatologia.backend.repository.UserRepository;
 import org.slf4j.Logger;
@@ -19,6 +21,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 
 /**
  * Заполняет пустую базу учебными (тестовыми) данными при первом запуске.
@@ -34,15 +37,18 @@ public class DemoDataInitializer implements ApplicationRunner {
     private final PatientRepository patients;
     private final SpecialtyRepository specialties;
     private final RoomRepository rooms;
+    private final ScheduleRepository schedules;
     private final PasswordEncoder encoder;
 
     public DemoDataInitializer(UserRepository users, DoctorRepository doctors, PatientRepository patients,
-                               SpecialtyRepository specialties, RoomRepository rooms, PasswordEncoder encoder) {
+                               SpecialtyRepository specialties, RoomRepository rooms, ScheduleRepository schedules,
+                               PasswordEncoder encoder) {
         this.users = users;
         this.doctors = doctors;
         this.patients = patients;
         this.specialties = specialties;
         this.rooms = rooms;
+        this.schedules = schedules;
         this.encoder = encoder;
     }
 
@@ -52,6 +58,34 @@ public class DemoDataInitializer implements ApplicationRunner {
         if (users.count() == 0) {
             seedPeople();
             log.info("Созданы демонстрационные пользователи, врачи и пациенты");
+        }
+        if (schedules.count() == 0 && doctors.count() > 0) {
+            seedSchedules();
+            log.info("Создано демонстрационное расписание врачей");
+        }
+    }
+
+    private void seedSchedules() {
+        week("ivanova", LocalTime.of(9, 0), LocalTime.of(18, 0), 1, 2, 3, 4, 5);
+        week("petrov", LocalTime.of(10, 0), LocalTime.of(19, 0), 1, 3, 5);
+        week("petrov", LocalTime.of(10, 0), LocalTime.of(15, 0), 6);
+        week("sidorova", LocalTime.of(9, 0), LocalTime.of(17, 0), 2, 4);
+        week("sidorova", LocalTime.of(10, 0), LocalTime.of(14, 0), 6);
+        week("smirnov", LocalTime.of(8, 0), LocalTime.of(14, 0), 1, 2, 3, 4, 5);
+    }
+
+    private void week(String username, LocalTime start, LocalTime end, int... days) {
+        Doctor doctor = users.findByUsername(username).flatMap(u -> doctors.findByUserId(u.getId())).orElse(null);
+        if (doctor == null) {
+            return;
+        }
+        for (int day : days) {
+            Schedule s = new Schedule();
+            s.setDoctor(doctor);
+            s.setDayOfWeek(day);
+            s.setStartTime(start);
+            s.setEndTime(end);
+            schedules.save(s);
         }
     }
 
