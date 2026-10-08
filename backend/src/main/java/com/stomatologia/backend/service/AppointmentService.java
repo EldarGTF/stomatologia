@@ -295,7 +295,7 @@ public class AppointmentService {
         }
     }
 
-    private static void checkCanView(Appointment a, AuthUser me) {
+    static void checkCanView(Appointment a, AuthUser me) {
         if ((me.is(Role.DOCTOR) && !a.getDoctor().getId().equals(me.doctorId()))
                 || (me.is(Role.PATIENT) && !a.getPatient().getId().equals(me.patientId()))) {
             throw ApiException.forbidden("Нет доступа к этой записи");

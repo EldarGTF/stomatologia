@@ -44,6 +44,7 @@
         <Button fx:id="completeButton" text="Приём завершён" onAction="#onComplete"/>
         <Button fx:id="noShowButton" text="Неявка" onAction="#onNoShow"/>
         <Button fx:id="invoiceButton" text="Счёт и оплата" onAction="#onInvoice"/>
+        <Button fx:id="ticketButton" text="Талон (Word)" onAction="#onTicket"/>
         <Button fx:id="historyButton" text="История изменений" onAction="#onHistory"/>
         <Region HBox.hgrow="ALWAYS"/>
         <Label fx:id="hintLabel" styleClass="muted"/>

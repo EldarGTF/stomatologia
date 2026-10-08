@@ -36,9 +36,20 @@ public final class Dialogs {
     }
 
     public static boolean confirm(String message) {
-        Alert alert = alert(Alert.AlertType.CONFIRMATION, "Подтверждение", message);
-        ButtonType yes = new ButtonType("Да", ButtonBar.ButtonData.OK_DONE);
-        ButtonType no = new ButtonType("Отмена", ButtonBar.ButtonData.CANCEL_CLOSE);
+        return ask(Alert.AlertType.CONFIRMATION, "Подтверждение", message, "Да", "Отмена");
+    }
+
+    /**
+     * Информационное сообщение с дополнительным действием; true — пользователь выбрал действие.
+     */
+    public static boolean offer(String title, String message, String actionText) {
+        return ask(Alert.AlertType.INFORMATION, title, message, actionText, "Закрыть");
+    }
+
+    private static boolean ask(Alert.AlertType type, String title, String message, String yesText, String noText) {
+        Alert alert = alert(type, title, message);
+        ButtonType yes = new ButtonType(yesText, ButtonBar.ButtonData.OK_DONE);
+        ButtonType no = new ButtonType(noText, ButtonBar.ButtonData.CANCEL_CLOSE);
         alert.getButtonTypes().setAll(yes, no);
         Optional<ButtonType> result = alert.showAndWait();
         return result.isPresent() && result.get() == yes;

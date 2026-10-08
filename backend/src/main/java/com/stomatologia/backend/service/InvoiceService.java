@@ -179,11 +179,11 @@ public class InvoiceService {
         return "СЧ-" + NUMBER_DATE.format(issuedAt) + "-" + String.format("%06d", appointmentId);
     }
 
-    private Invoice find(Long id) {
+    Invoice find(Long id) {
         return invoices.findById(id).orElseThrow(() -> ApiException.notFound("Счёт не найден"));
     }
 
-    private static void checkCanView(Invoice invoice) {
+    static void checkCanView(Invoice invoice) {
         AuthUser me = CurrentUser.get();
         if (me.is(Role.PATIENT) && !invoice.getAppointment().getPatient().getId().equals(me.patientId())) {
             throw ApiException.forbidden("Нет доступа к этому счёту");

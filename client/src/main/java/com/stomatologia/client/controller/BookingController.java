@@ -8,6 +8,7 @@ import com.stomatologia.client.model.AppointmentModels.AppointmentRequest;
 import com.stomatologia.client.model.Role;
 import com.stomatologia.client.ui.BookingForm;
 import com.stomatologia.client.ui.Dialogs;
+import com.stomatologia.client.ui.Downloads;
 import com.stomatologia.client.ui.Formats;
 import com.stomatologia.client.ui.Fx;
 import com.stomatologia.client.ui.Screen;
@@ -95,12 +96,18 @@ public class BookingController {
         bookButton.setDisable(true);
         Fx.async(() -> ApiClient.get().post("/api/appointments", request, AppointmentDto.class), a -> {
             bookButton.setDisable(false);
-            Dialogs.info("Запись создана", (patientMode ? "Вы записаны" : a.patientName() + " записан(а)")
-                    + " на " + Formats.dateTime(a.startAt()) + "\nВрач: " + a.doctorName() + ", кабинет "
-                    + a.roomNumber() + "\nУслуга: " + a.serviceName() + " — " + Formats.money(a.price()));
             form.resetAfterBooking();
             if (patientMode) {
                 loadUpcoming();
+            }
+            boolean print = Dialogs.offer("Запись создана",
+                    (patientMode ? "Вы записаны" : a.patientName() + " записан(а)")
+                    + " на " + Formats.dateTime(a.startAt()) + "\nВрач: " + a.doctorName() + ", кабинет "
+                    + a.roomNumber() + "\nУслуга: " + a.serviceName() + " — " + Formats.money(a.price()),
+                    "Талон (Word)");
+            if (print) {
+                Downloads.word("/api/reports/appointments/" + a.id() + "/ticket",
+                        AppointmentsController.ticketFileName(a));
             }
         }, ex -> {
             bookButton.setDisable(false);

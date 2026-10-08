@@ -1,6 +1,7 @@
 package com.stomatologia.backend.repository;
 
 import com.stomatologia.backend.domain.Payment;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -15,4 +16,8 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
     BigDecimal sumBetween(@Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
 
     List<Payment> findByPaidAtGreaterThanEqualAndPaidAtLessThan(LocalDateTime from, LocalDateTime to);
+
+    @EntityGraph(attributePaths = {"invoice", "invoice.appointment", "invoice.appointment.doctor",
+            "invoice.appointment.service", "invoice.appointment.patient", "receivedBy"})
+    List<Payment> findByPaidAtGreaterThanEqualAndPaidAtLessThanOrderByPaidAt(LocalDateTime from, LocalDateTime to);
 }

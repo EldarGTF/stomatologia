@@ -12,6 +12,7 @@ import com.stomatologia.client.model.AppointmentModels.StatusRequest;
 import com.stomatologia.client.model.DoctorModels.DoctorDto;
 import com.stomatologia.client.model.Role;
 import com.stomatologia.client.ui.Dialogs;
+import com.stomatologia.client.ui.Downloads;
 import com.stomatologia.client.ui.Formats;
 import com.stomatologia.client.ui.Fx;
 import com.stomatologia.client.ui.Screen;
@@ -68,6 +69,8 @@ public class AppointmentsController {
     private Button historyButton;
     @FXML
     private Button invoiceButton;
+    @FXML
+    private Button ticketButton;
 
     private final ObservableList<AppointmentDto> appointments = FXCollections.observableArrayList();
     private final FilteredList<AppointmentDto> filtered = new FilteredList<>(appointments);
@@ -225,6 +228,7 @@ public class AppointmentsController {
         completeButton.setDisable(!scheduled || !a.started());
         noShowButton.setDisable(!scheduled || !a.started());
         historyButton.setDisable(a == null);
+        ticketButton.setDisable(a == null);
         invoiceButton.setDisable(a == null || a.status() == AppointmentStatus.CANCELLED
                 || a.status() == AppointmentStatus.NO_SHOW);
         if (a == null) {
@@ -335,6 +339,18 @@ public class AppointmentsController {
                         InvoiceDialogs.details(invoice);
                     }
                 });
+    }
+
+    @FXML
+    private void onTicket() {
+        AppointmentDto a = selected();
+        if (a != null) {
+            Downloads.word("/api/reports/appointments/" + a.id() + "/ticket", ticketFileName(a));
+        }
+    }
+
+    static String ticketFileName(AppointmentDto a) {
+        return "Талон " + Formats.DATE_TIME.format(a.startAt()).replace(':', '-') + " " + a.patientName() + ".docx";
     }
 
     @FXML

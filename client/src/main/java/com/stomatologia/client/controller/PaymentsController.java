@@ -8,6 +8,7 @@ import com.stomatologia.client.model.InvoiceModels.InvoiceDto;
 import com.stomatologia.client.model.InvoiceModels.InvoiceStatus;
 import com.stomatologia.client.model.Role;
 import com.stomatologia.client.ui.Dialogs;
+import com.stomatologia.client.ui.Downloads;
 import com.stomatologia.client.ui.Formats;
 import com.stomatologia.client.ui.Fx;
 import com.stomatologia.client.ui.Screen;
@@ -56,6 +57,8 @@ public class PaymentsController {
     private Button payButton;
     @FXML
     private Button detailsButton;
+    @FXML
+    private Button wordButton;
     @FXML
     private Button cancelButton;
 
@@ -131,6 +134,7 @@ public class PaymentsController {
     private void updateButtons(InvoiceDto i) {
         payButton.setDisable(i == null || !i.payable());
         detailsButton.setDisable(i == null);
+        wordButton.setDisable(i == null);
         cancelButton.setDisable(i == null || i.status() == InvoiceStatus.CANCELLED || i.paidAmount().signum() > 0);
     }
 
@@ -193,6 +197,14 @@ public class PaymentsController {
         InvoiceDto i = selected();
         if (i != null) {
             InvoiceDialogs.details(i);
+        }
+    }
+
+    @FXML
+    private void onWord() {
+        InvoiceDto i = selected();
+        if (i != null) {
+            Downloads.word("/api/reports/invoices/" + i.id(), "Счёт " + i.number() + ".docx");
         }
     }
 

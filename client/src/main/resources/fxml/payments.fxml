@@ -21,6 +21,7 @@
         <Region HBox.hgrow="ALWAYS"/>
         <Button fx:id="payButton" text="Принять оплату" styleClass="primary" onAction="#onPay"/>
         <Button fx:id="detailsButton" text="Подробнее" onAction="#onDetails"/>
+        <Button fx:id="wordButton" text="Счёт (Word)" onAction="#onWord"/>
         <Button fx:id="cancelButton" text="Аннулировать" styleClass="danger" onAction="#onCancel"/>
     </HBox>
     <HBox spacing="12">
