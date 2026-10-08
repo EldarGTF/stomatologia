@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.CheckBox?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.Spinner?>
+<?import javafx.scene.control.Tab?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.control.TabPane?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.ColumnConstraints?>
+<?import javafx.scene.layout.GridPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.VBox?>
+
+<VBox xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="com.stomatologia.client.controller.SettingsController"
+      styleClass="content">
+    <HBox styleClass="toolbar">
+        <VBox>
+            <Label text="Настройки клиники" styleClass="page-title"/>
+            <Label fx:id="updatedLabel" styleClass="muted"/>
+        </VBox>
+        <Region HBox.hgrow="ALWAYS"/>
+        <Label fx:id="dirtyLabel" text="Есть несохранённые изменения" styleClass="badge,badge-warning"/>
+        <Button fx:id="revertButton" text="Отменить изменения" onAction="#onRevert"/>
+        <Button fx:id="saveButton" text="Сохранить" styleClass="primary" onAction="#onSave"/>
+    </HBox>
+
+    <TabPane fx:id="tabs" tabClosingPolicy="UNAVAILABLE" VBox.vgrow="ALWAYS" styleClass="settings-tabs">
+        <Tab text="Реквизиты">
+            <VBox styleClass="card" spacing="12">
+                <Label text="Печатаются в шапке талона на приём и счёта на оплату" styleClass="muted"/>
+                <GridPane styleClass="settings-grid">
+                    <columnConstraints>
+                        <ColumnConstraints minWidth="190"/>
+                        <ColumnConstraints minWidth="360" prefWidth="460"/>
+                        <ColumnConstraints minWidth="200" hgrow="ALWAYS"/>
+                    </columnConstraints>
+                    <Label text="Название *" styleClass="field-label" GridPane.rowIndex="0"/>
+                    <TextField fx:id="nameField" GridPane.rowIndex="0" GridPane.columnIndex="1"/>
+
+                    <Label text="Адрес *" styleClass="field-label" GridPane.rowIndex="1"/>
+                    <TextField fx:id="addressField" GridPane.rowIndex="1" GridPane.columnIndex="1"/>
+
+                    <Label text="Телефон *" styleClass="field-label" GridPane.rowIndex="2"/>
+                    <TextField fx:id="phoneField" GridPane.rowIndex="2" GridPane.columnIndex="1"/>
+
+                    <Label text="Email" styleClass="field-label" GridPane.rowIndex="3"/>
+                    <TextField fx:id="emailField" GridPane.rowIndex="3" GridPane.columnIndex="1"/>
+
+                    <Label text="БИН" styleClass="field-label" GridPane.rowIndex="4"/>
+                    <TextField fx:id="binField" promptText="12 цифр" GridPane.rowIndex="4" GridPane.columnIndex="1"/>
+
+                    <Label text="Банк" styleClass="field-label" GridPane.rowIndex="5"/>
+                    <TextField fx:id="bankField" promptText="например, АО «Халык Банк»"
+                               GridPane.rowIndex="5" GridPane.columnIndex="1"/>
+
+                    <Label text="ИИК (счёт)" styleClass="field-label" GridPane.rowIndex="6"/>
+                    <TextField fx:id="iikField" promptText="KZ00 0000 0000 0000 0000"
+                               GridPane.rowIndex="6" GridPane.columnIndex="1"/>
+
+                    <Label text="БИК банка" styleClass="field-label" GridPane.rowIndex="7"/>
+                    <TextField fx:id="bikField" promptText="например, HSBKKZKX"
+                               GridPane.rowIndex="7" GridPane.columnIndex="1"/>
+                    <Label text="Банковские реквизиты попадают в счёт, если указан ИИК"
+                           styleClass="muted" wrapText="true" GridPane.rowIndex="7" GridPane.columnIndex="2"/>
+                </GridPane>
+            </VBox>
+        </Tab>
+
+        <Tab text="Запись на приём">
+            <VBox styleClass="card" spacing="12">
+                <Label text="Правила применяются сразу: к свободным окнам, поиску ближайшего окна и проверке записи"
+                       styleClass="muted"/>
+                <GridPane styleClass="settings-grid">
+                    <columnConstraints>
+                        <ColumnConstraints minWidth="290"/>
+                        <ColumnConstraints minWidth="140"/>
+                        <ColumnConstraints minWidth="200" hgrow="ALWAYS"/>
+                    </columnConstraints>
+                    <Label text="Шаг сетки записи" styleClass="field-label" GridPane.rowIndex="0"/>
+                    <ComboBox fx:id="stepCombo" prefWidth="140" GridPane.rowIndex="0" GridPane.columnIndex="1"/>
+                    <Label text="Окна предлагаются с этим шагом: 9:00, 9:15, 9:30…" styleClass="muted"
+                           wrapText="true" GridPane.rowIndex="0" GridPane.columnIndex="2"/>
+
+                    <Label text="Запись открыта вперёд, дней" styleClass="field-label" GridPane.rowIndex="1"/>
+                    <Spinner fx:id="horizonSpinner" editable="true" prefWidth="140"
+                             GridPane.rowIndex="1" GridPane.columnIndex="1"/>
+                    <Label fx:id="horizonHint" styleClass="muted" wrapText="true"
+                           GridPane.rowIndex="1" GridPane.columnIndex="2"/>
+
+                    <Label text="Пациент записывается не позднее чем за, ч" styleClass="field-label"
+                           GridPane.rowIndex="2"/>
+                    <Spinner fx:id="leadSpinner" editable="true" prefWidth="140"
+                             GridPane.rowIndex="2" GridPane.columnIndex="1"/>
+                    <Label text="Только для онлайн-записи пациентом; регистратор записывает на любое будущее время"
+                           styleClass="muted" wrapText="true" GridPane.rowIndex="2" GridPane.columnIndex="2"/>
+
+                    <Label text="Пациент отменяет или переносит не позднее чем за, ч" styleClass="field-label"
+                           GridPane.rowIndex="3"/>
+                    <Spinner fx:id="cancelSpinner" editable="true" prefWidth="140"
+                             GridPane.rowIndex="3" GridPane.columnIndex="1"/>
+                    <Label text="Позже — только по телефону клиники через регистратуру" styleClass="muted"
+                           wrapText="true" GridPane.rowIndex="3" GridPane.columnIndex="2"/>
+                </GridPane>
+            </VBox>
+        </Tab>
+
+        <Tab text="Счета">
+            <VBox styleClass="card" spacing="12">
+                <GridPane styleClass="settings-grid">
+                    <columnConstraints>
+                        <ColumnConstraints minWidth="230"/>
+                        <ColumnConstraints minWidth="160"/>
+                        <ColumnConstraints minWidth="200" hgrow="ALWAYS"/>
+                    </columnConstraints>
+                    <Label text="Префикс номера счёта" styleClass="field-label" GridPane.rowIndex="0"/>
+                    <TextField fx:id="prefixField" prefWidth="160" GridPane.rowIndex="0" GridPane.columnIndex="1"/>
+                    <Label fx:id="prefixHint" styleClass="muted" GridPane.rowIndex="0" GridPane.columnIndex="2"/>
+
+                    <CheckBox fx:id="vatCheck" text="Выделять НДС в счёте" GridPane.rowIndex="1"/>
+                    <TextField fx:id="vatField" promptText="ставка, %" prefWidth="160"
+                               GridPane.rowIndex="1" GridPane.columnIndex="1"/>
+                    <Label fx:id="vatHint" styleClass="muted" wrapText="true"
+                           GridPane.rowIndex="1" GridPane.columnIndex="2"/>
+
+                    <CheckBox fx:id="prepayCheck" text="Предоплата дорогих услуг" GridPane.rowIndex="2"/>
+                    <TextField fx:id="prepayField" promptText="от суммы, ₸" prefWidth="160"
+                               GridPane.rowIndex="2" GridPane.columnIndex="1"/>
+                    <Label fx:id="prepayHint" styleClass="muted" wrapText="true"
+                           GridPane.rowIndex="2" GridPane.columnIndex="2"/>
+                </GridPane>
+            </VBox>
+        </Tab>
+
+        <Tab fx:id="holidaysTab" text="Нерабочие дни">
+            <VBox styleClass="card" spacing="10">
+                <HBox styleClass="toolbar">
+                    <VBox>
+                        <Label text="Праздники и выходные дни клиники" styleClass="section-title"/>
+                        <Label fx:id="holidaysCount" styleClass="muted"/>
+                    </VBox>
+                    <Region HBox.hgrow="ALWAYS"/>
+                    <Button text="Добавить" styleClass="primary" onAction="#onAddHoliday"/>
+                    <Button fx:id="deleteHolidayButton" text="Удалить" styleClass="danger"
+                            onAction="#onDeleteHoliday"/>
+                </HBox>
+                <Label text="В эти дни запись закрыта для всех врачей, они не учитываются в отчёте загрузки"
+                       styleClass="muted"/>
+                <TableView fx:id="holidaysTable" VBox.vgrow="ALWAYS"/>
+            </VBox>
+        </Tab>
+    </TabPane>
+</VBox>

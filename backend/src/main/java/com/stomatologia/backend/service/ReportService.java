@@ -32,6 +32,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -52,11 +53,12 @@ public class ReportService {
     private final InvoiceRepository invoices;
     private final WordDocuments word;
     private final ExcelReports excel;
+    private final ClinicSettingsService clinic;
 
     public ReportService(AppointmentService appointmentService, InvoiceService invoiceService,
                          AppointmentRepository appointments, DoctorRepository doctors, ScheduleRepository schedules,
                          PaymentRepository payments, InvoiceRepository invoices, WordDocuments word,
-                         ExcelReports excel) {
+                         ExcelReports excel, ClinicSettingsService clinic) {
         this.appointmentService = appointmentService;
         this.invoiceService = invoiceService;
         this.appointments = appointments;
@@ -66,6 +68,7 @@ public class ReportService {
         this.invoices = invoices;
         this.word = word;
         this.excel = excel;
+        this.clinic = clinic;
     }
 
     @Transactional(readOnly = true)
@@ -73,7 +76,7 @@ public class ReportService {
         Appointment a = appointmentService.find(appointmentId);
         AppointmentService.checkCanView(a, CurrentUser.get());
         log.info("Талон на приём #{} сформирован (запросил {})", appointmentId, CurrentUser.get().username());
-        return word.ticket(a, CurrentUser.get().fullName());
+        return word.ticket(a, clinic.current(), CurrentUser.get().fullName());
     }
 
     @Transactional(readOnly = true)
@@ -81,7 +84,7 @@ public class ReportService {
         Invoice invoice = invoiceService.find(invoiceId);
         InvoiceService.checkCanView(invoice);
         log.info("Счёт {} выгружен в Word (запросил {})", invoice.getNumber(), CurrentUser.get().username());
-        return word.invoice(invoice, CurrentUser.get().fullName());
+        return word.invoice(invoice, clinic.current(), CurrentUser.get().fullName());
     }
 
     @Transactional(readOnly = true)
@@ -96,6 +99,7 @@ public class ReportService {
         for (Schedule s : schedules.findAllWithDoctor()) {
             week.computeIfAbsent(s.getDoctor().getId(), k -> new HashMap<>()).put(s.getDayOfWeek(), s);
         }
+        Set<LocalDate> holidays = clinic.holidayDates(from, to);
 
         List<DoctorPeriodLoad> rows = new ArrayList<>();
         for (Doctor d : doctors.findAllWithDetails()) {
@@ -110,7 +114,7 @@ public class ReportService {
             int bookedMinutes = 0;
             for (LocalDate day = from; !day.isAfter(to); day = day.plusDays(1)) {
                 Schedule s = doctorWeek.get(day.getDayOfWeek().getValue());
-                if (s == null) {
+                if (s == null || holidays.contains(day)) {
                     continue;
                 }
                 LocalDate date = day;

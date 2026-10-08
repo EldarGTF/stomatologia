@@ -6,6 +6,7 @@ import com.stomatologia.backend.domain.AppointmentAudit;
 import com.stomatologia.backend.domain.AppointmentStatus;
 import com.stomatologia.backend.domain.AuditAction;
 import com.stomatologia.backend.domain.ClinicService;
+import com.stomatologia.backend.domain.ClinicSettings;
 import com.stomatologia.backend.domain.Doctor;
 import com.stomatologia.backend.domain.Patient;
 import com.stomatologia.backend.domain.Role;
@@ -43,6 +44,7 @@ import java.util.Objects;
 public class AppointmentService {
 
     private static final Logger log = LogManager.getLogger(AppointmentService.class);
+    private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("dd.MM.yyyy");
     private static final DateTimeFormatter DATE_TIME = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm");
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm");
 
@@ -54,10 +56,12 @@ public class AppointmentService {
     private final UserRepository users;
     private final ServiceCatalogService catalog;
     private final InvoiceService invoices;
+    private final ClinicSettingsService clinic;
 
     public AppointmentService(AppointmentRepository appointments, AppointmentAuditRepository audit,
                               DoctorRepository doctors, PatientRepository patients, ScheduleRepository schedules,
-                              UserRepository users, ServiceCatalogService catalog, InvoiceService invoices) {
+                              UserRepository users, ServiceCatalogService catalog, InvoiceService invoices,
+                              ClinicSettingsService clinic) {
         this.appointments = appointments;
         this.audit = audit;
         this.doctors = doctors;
@@ -66,6 +70,7 @@ public class AppointmentService {
         this.users = users;
         this.catalog = catalog;
         this.invoices = invoices;
+        this.clinic = clinic;
     }
 
     public record Filter(LocalDate from, LocalDate to, Long doctorId, Long patientId, AppointmentStatus status) {
@@ -135,6 +140,9 @@ public class AppointmentService {
         writeAudit(a, AuditAction.CREATE, null, describe(a), me);
         log.info("Запись #{} создана: пациент {}, {} (оформил {})", a.getId(), patient.getFullName(), describe(a),
                 me.username());
+        if (clinic.current().requiresPrepayment(service.getPrice())) {
+            invoices.onBookedWithPrepayment(a);
+        }
         return AppointmentDto.from(a);
     }
 
@@ -152,6 +160,9 @@ public class AppointmentService {
         boolean serviceChanged = !a.getService().getId().equals(r.serviceId());
         boolean timeChanged = serviceChanged || !a.getStartAt().equals(r.startAt())
                 || !a.getDoctor().getId().equals(r.doctorId());
+        if (timeChanged) {
+            checkPatientDeadline(a, me, "Перенести");
+        }
 
         Doctor doctor = findDoctor(r.doctorId());
         ClinicService service = a.getService().getId().equals(r.serviceId()) ? a.getService()
@@ -196,6 +207,7 @@ public class AppointmentService {
         Appointment a = find(id);
         checkCanModify(a, me);
         requireScheduled(a, "отменить");
+        checkPatientDeadline(a, me, "Отменить");
         a.setStatus(AppointmentStatus.CANCELLED);
         appointments.saveAndFlush(a);
         invoices.onClosedWithoutVisit(a);
@@ -242,16 +254,31 @@ public class AppointmentService {
     }
 
     /**
-     * Проверки перед записью: время в будущем, в рамках графика врача, врач, кабинет и пациент свободны.
+     * Проверки перед записью: время в будущем и в пределах горизонта записи, день рабочий для клиники
+     * и для врача, время в графике, врач, кабинет и пациент свободны.
      */
     void ensureBookable(Appointment a, Long excludeId) {
         LocalDateTime start = a.getStartAt();
         LocalDateTime end = a.getEndAt();
-        if (start.isBefore(LocalDateTime.now())) {
+        LocalDateTime now = LocalDateTime.now();
+        if (start.isBefore(now)) {
             throw ApiException.badRequest("Нельзя записать на прошедшее время");
         }
         if (!start.toLocalDate().equals(end.toLocalDate())) {
             throw ApiException.badRequest("Приём должен заканчиваться в тот же день");
+        }
+        ClinicSettings settings = clinic.current();
+        LocalDate lastDay = settings.lastBookableDay(now.toLocalDate());
+        if (start.toLocalDate().isAfter(lastDay)) {
+            throw ApiException.badRequest("Запись открыта на " + settings.getBookingHorizonDays()
+                    + " дн. вперёд — не позднее " + DATE.format(lastDay));
+        }
+        clinic.holiday(start.toLocalDate()).ifPresent(h -> {
+            throw ApiException.badRequest(DATE.format(h.getDay()) + " — нерабочий день клиники («" + h.getName() + "»)");
+        });
+        if (CurrentUser.get().is(Role.PATIENT) && start.isBefore(now.plusHours(settings.getMinLeadHours()))) {
+            throw ApiException.badRequest("Онлайн-запись — не позднее чем за " + settings.getMinLeadHours()
+                    + " ч до приёма. На более раннее время запишитесь по телефону " + settings.getPhone());
         }
         Doctor doctor = a.getDoctor();
         Schedule schedule = schedules.findByDoctorIdAndDayOfWeek(doctor.getId(), start.getDayOfWeek().getValue())
@@ -315,6 +342,18 @@ public class AppointmentService {
     private static void checkCanModify(Appointment a, AuthUser me) {
         if (me.is(Role.DOCTOR) || (me.is(Role.PATIENT) && !Objects.equals(a.getPatient().getId(), me.patientId()))) {
             throw ApiException.forbidden("Недостаточно прав для изменения записи");
+        }
+    }
+
+    /** Пациент может отменить или перенести запись сам не позднее чем за patient_cancel_hours до приёма. */
+    private void checkPatientDeadline(Appointment a, AuthUser me, String verb) {
+        if (!me.is(Role.PATIENT)) {
+            return;
+        }
+        ClinicSettings settings = clinic.current();
+        if (a.getStartAt().isBefore(LocalDateTime.now().plusHours(settings.getPatientCancelHours()))) {
+            throw ApiException.conflict(verb + " запись онлайн можно не позднее чем за "
+                    + settings.getPatientCancelHours() + " ч до приёма. Позвоните в клинику: " + settings.getPhone());
         }
     }
 

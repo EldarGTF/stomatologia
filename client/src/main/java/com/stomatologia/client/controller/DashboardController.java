@@ -116,7 +116,8 @@ public class DashboardController {
 
     private void show(DashboardDto d) {
         dateLabel.setText("Сегодня " + Formats.dayFull(d.date().getDayOfWeek().getValue()).toLowerCase() + ", "
-                + Formats.date(d.date()));
+                + Formats.date(d.date())
+                + (d.holidayName() != null ? " · нерабочий день клиники («" + d.holidayName() + "»)" : ""));
         updatedLabel.setText("обновлено в " + Formats.TIME.format(LocalTime.now()));
 
         appointmentsLabel.setText(String.valueOf(d.appointmentsToday()));

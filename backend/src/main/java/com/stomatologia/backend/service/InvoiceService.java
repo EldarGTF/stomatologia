@@ -43,11 +43,14 @@ public class InvoiceService {
     private final InvoiceRepository invoices;
     private final AppointmentRepository appointments;
     private final UserRepository users;
+    private final ClinicSettingsService clinic;
 
-    public InvoiceService(InvoiceRepository invoices, AppointmentRepository appointments, UserRepository users) {
+    public InvoiceService(InvoiceRepository invoices, AppointmentRepository appointments, UserRepository users,
+                          ClinicSettingsService clinic) {
         this.invoices = invoices;
         this.appointments = appointments;
         this.users = users;
+        this.clinic = clinic;
     }
 
     public record Filter(LocalDate from, LocalDate to, InvoiceStatus status, Long patientId) {
@@ -143,6 +146,15 @@ public class InvoiceService {
         return InvoiceDto.from(invoice);
     }
 
+    /** Услуга дороже порога предоплаты — счёт выставляется сразу при записи. */
+    void onBookedWithPrepayment(Appointment a) {
+        if (invoices.findByAppointmentId(a.getId()).isEmpty()) {
+            Invoice invoice = issue(a);
+            log.info("Счёт {} выставлен при записи: услуга «{}» требует предоплаты", invoice.getNumber(),
+                    a.getService().getName());
+        }
+    }
+
     /** Приём завершён — выставляем счёт, если его ещё нет. */
     void onCompleted(Appointment a) {
         if (invoices.findByAppointmentId(a.getId()).isEmpty()) {
@@ -183,7 +195,7 @@ public class InvoiceService {
         invoice.setAppointment(a);
         invoice.setAmount(a.getService().getPrice());
         invoice.setIssuedAt(LocalDateTime.now());
-        invoice.setNumber(number(invoice.getIssuedAt(), a.getId()));
+        invoice.setNumber(number(clinic.current().getInvoicePrefix(), invoice.getIssuedAt(), a.getId()));
         invoice.refreshStatus();
         Invoice saved = invoices.saveAndFlush(invoice);
         log.info("Выставлен счёт {} на {} ₸: приём #{}, пациент {}", saved.getNumber(),
@@ -191,8 +203,8 @@ public class InvoiceService {
         return saved;
     }
 
-    public static String number(LocalDateTime issuedAt, Long appointmentId) {
-        return "СЧ-" + NUMBER_DATE.format(issuedAt) + "-" + String.format("%06d", appointmentId);
+    public static String number(String prefix, LocalDateTime issuedAt, Long appointmentId) {
+        return prefix + "-" + NUMBER_DATE.format(issuedAt) + "-" + String.format("%06d", appointmentId);
     }
 
     Invoice find(Long id) {

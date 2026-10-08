@@ -1,6 +1,7 @@
 package com.stomatologia.backend.report;
 
 import com.stomatologia.backend.domain.Appointment;
+import com.stomatologia.backend.domain.ClinicSettings;
 import com.stomatologia.backend.domain.Invoice;
 import com.stomatologia.backend.domain.Patient;
 import com.stomatologia.backend.domain.Payment;
@@ -11,13 +12,13 @@ import org.apache.poi.xwpf.usermodel.XWPFRun;
 import org.apache.poi.xwpf.usermodel.XWPFTable;
 import org.apache.poi.xwpf.usermodel.XWPFTableCell;
 import org.apache.poi.xwpf.usermodel.XWPFTableRow;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.time.LocalDateTime;
@@ -37,21 +38,9 @@ public class WordDocuments {
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm");
     private static final String FONT = "Times New Roman";
 
-    private final String clinicName;
-    private final String clinicAddress;
-    private final String clinicPhone;
-
-    public WordDocuments(@Value("${app.clinic-name}") String clinicName,
-                         @Value("${app.clinic-address}") String clinicAddress,
-                         @Value("${app.clinic-phone}") String clinicPhone) {
-        this.clinicName = clinicName;
-        this.clinicAddress = clinicAddress;
-        this.clinicPhone = clinicPhone;
-    }
-
-    public byte[] ticket(Appointment a, String issuedBy) {
+    public byte[] ticket(Appointment a, ClinicSettings clinic, String issuedBy) {
         try (XWPFDocument doc = new XWPFDocument()) {
-            header(doc);
+            header(doc, clinic);
             paragraph(doc, "ТАЛОН НА ПРИЁМ № " + String.format("%06d", a.getId()), 16, true, ParagraphAlignment.CENTER);
             paragraph(doc, "", 6, false, ParagraphAlignment.LEFT);
 
@@ -80,8 +69,9 @@ public class WordDocuments {
             }
 
             paragraph(doc, "", 6, false, ParagraphAlignment.LEFT);
-            paragraph(doc, "Пожалуйста, приходите за 10 минут до начала приёма и возьмите с собой паспорт. "
-                    + "Если вы не сможете прийти, сообщите об этом по телефону " + clinicPhone + ".",
+            paragraph(doc, "Пожалуйста, приходите за 10 минут до начала приёма и возьмите с собой удостоверение "
+                    + "личности. Отменить или перенести запись в личном кабинете можно не позднее чем за "
+                    + clinic.getPatientCancelHours() + " ч до приёма, позже — по телефону " + clinic.getPhone() + ".",
                     11, false, ParagraphAlignment.LEFT);
             footer(doc, issuedBy);
             return bytes(doc);
@@ -90,19 +80,23 @@ public class WordDocuments {
         }
     }
 
-    public byte[] invoice(Invoice invoice, String issuedBy) {
+    public byte[] invoice(Invoice invoice, ClinicSettings clinic, String issuedBy) {
         Appointment a = invoice.getAppointment();
         try (XWPFDocument doc = new XWPFDocument()) {
-            header(doc);
+            header(doc, clinic);
             paragraph(doc, "СЧЁТ № " + invoice.getNumber(), 16, true, ParagraphAlignment.CENTER);
             paragraph(doc, "от " + DATE.format(invoice.getIssuedAt()), 12, false, ParagraphAlignment.CENTER);
             paragraph(doc, "", 6, false, ParagraphAlignment.LEFT);
+            String requisites = requisites(clinic);
+            if (requisites != null) {
+                labelValue(doc, "Получатель: ", requisites);
+            }
             labelValue(doc, "Плательщик: ", a.getPatient().getFullName()
                     + (a.getPatient().getPhone() != null ? ", тел. " + a.getPatient().getPhone() : ""));
             labelValue(doc, "Приём: ", DATE_TIME.format(a.getStartAt()) + ", врач " + a.getDoctor().getFullName()
                     + " (" + a.getDoctor().getSpecialty().getName() + "), каб. " + a.getRoom().getNumber());
 
-            XWPFTable items = doc.createTable(3, 5);
+            XWPFTable items = doc.createTable(clinic.isVatEnabled() ? 4 : 3, 5);
             items.setWidth("100%");
             String[] head = {"№", "Наименование услуги", "Кол-во", "Цена", "Сумма"};
             for (int i = 0; i < head.length; i++) {
@@ -117,6 +111,11 @@ public class WordDocuments {
             XWPFTableRow total = items.getRow(2);
             cell(total.getCell(3), "Итого:", true);
             cell(total.getCell(4), money(invoice.getAmount()), true);
+            if (clinic.isVatEnabled()) {
+                XWPFTableRow vat = items.getRow(3);
+                cell(vat.getCell(3), "в т.ч. НДС " + percent(clinic.getVatRate()) + ":", false);
+                cell(vat.getCell(4), money(vatIncluded(invoice.getAmount(), clinic.getVatRate())), false);
+            }
 
             paragraph(doc, "", 6, false, ParagraphAlignment.LEFT);
             labelValue(doc, "Сумма прописью: ", MoneyInWords.tenge(invoice.getAmount()));
@@ -146,10 +145,42 @@ public class WordDocuments {
         }
     }
 
-    private void header(XWPFDocument doc) {
-        paragraph(doc, clinicName, 14, true, ParagraphAlignment.CENTER);
-        paragraph(doc, clinicAddress + " · тел. " + clinicPhone, 10, false, ParagraphAlignment.CENTER);
+    private static void header(XWPFDocument doc, ClinicSettings clinic) {
+        paragraph(doc, clinic.getName(), 14, true, ParagraphAlignment.CENTER);
+        paragraph(doc, clinic.getAddress() + " · тел. " + clinic.getPhone()
+                + (clinic.getEmail() != null ? " · " + clinic.getEmail() : ""), 10, false, ParagraphAlignment.CENTER);
+        if (clinic.getBin() != null) {
+            paragraph(doc, "БИН " + clinic.getBin(), 10, false, ParagraphAlignment.CENTER);
+        }
         paragraph(doc, "", 8, false, ParagraphAlignment.LEFT);
+    }
+
+    /** Банковские реквизиты получателя; null, если ИИК не заполнен. */
+    static String requisites(ClinicSettings clinic) {
+        if (clinic.getIik() == null) {
+            return null;
+        }
+        StringBuilder sb = new StringBuilder(clinic.getName());
+        if (clinic.getBin() != null) {
+            sb.append(", БИН ").append(clinic.getBin());
+        }
+        sb.append(", ИИК ").append(clinic.getIik());
+        if (clinic.getBankName() != null) {
+            sb.append(" в ").append(clinic.getBankName());
+        }
+        if (clinic.getBik() != null) {
+            sb.append(", БИК ").append(clinic.getBik());
+        }
+        return sb.toString();
+    }
+
+    /** НДС, уже включённый в сумму: amount × rate / (100 + rate). */
+    static BigDecimal vatIncluded(BigDecimal amount, BigDecimal rate) {
+        return amount.multiply(rate).divide(rate.add(BigDecimal.valueOf(100)), 2, RoundingMode.HALF_UP);
+    }
+
+    private static String percent(BigDecimal rate) {
+        return rate.stripTrailingZeros().toPlainString().replace('.', ',') + "%";
     }
 
     private static void footer(XWPFDocument doc, String issuedBy) {

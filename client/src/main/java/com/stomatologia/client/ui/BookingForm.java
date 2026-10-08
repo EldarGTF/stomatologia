@@ -11,6 +11,8 @@ import com.stomatologia.client.model.DoctorModels.SpecialtyDto;
 import com.stomatologia.client.model.PatientModels.PatientDto;
 import com.stomatologia.client.model.Role;
 import com.stomatologia.client.model.ServiceModels.ServiceDto;
+import com.stomatologia.client.model.SettingsModels.HolidayDto;
+import com.stomatologia.client.model.SettingsModels.SettingsDto;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.collections.transformation.FilteredList;
@@ -23,6 +25,7 @@ import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.control.ToggleGroup;
+import javafx.scene.control.Tooltip;
 import javafx.scene.layout.ColumnConstraints;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.GridPane;
@@ -32,7 +35,9 @@ import javafx.scene.layout.VBox;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -61,6 +66,9 @@ public class BookingForm extends VBox {
     private final Label selectionLabel = new Label();
     private final TextArea notes = new TextArea();
     private final ToggleGroup slotGroup = new ToggleGroup();
+
+    private final Map<LocalDate, String> holidays = new HashMap<>();
+    private int horizonDays = 60;
 
     private boolean ready;
     private Runnable onReady;
@@ -94,7 +102,17 @@ public class BookingForm extends VBox {
             @Override
             public void updateItem(LocalDate item, boolean empty) {
                 super.updateItem(item, empty);
-                setDisable(empty || item.isBefore(LocalDate.now()));
+                getStyleClass().remove("holiday-cell");
+                setTooltip(null);
+                if (empty || item == null) {
+                    return;
+                }
+                String holiday = holidays.get(item);
+                setDisable(!bookable(item));
+                if (holiday != null) {
+                    getStyleClass().add("holiday-cell");
+                    setTooltip(new Tooltip("Нерабочий день: " + holiday));
+                }
             }
         });
         grid.addRow(row++, label("Специальность"), stretch(specialtyCombo));
@@ -208,8 +226,16 @@ public class BookingForm extends VBox {
             List<PatientDto> p = patientMode ? List.of()
                     : api.get("/api/patients", new TypeReference<List<PatientDto>>() {
                     });
-            return new References(d, s, sv, p);
+            SettingsDto settings = api.get("/api/settings", SettingsDto.class);
+            List<HolidayDto> h = api.get(ApiClient.query("/api/holidays", "from", LocalDate.now(),
+                    "to", LocalDate.now().plusDays(settings.bookingHorizonDays())),
+                    new TypeReference<List<HolidayDto>>() {
+                    });
+            return new References(d, s, sv, p, settings, h);
         }, refs -> {
+            horizonDays = refs.settings().bookingHorizonDays();
+            holidays.clear();
+            refs.holidays().forEach(h -> holidays.put(h.day(), h.name()));
             doctors.setAll(refs.doctors().stream().filter(DoctorDto::active).toList());
             specialtyCombo.getItems().setAll(ALL_SPECIALTIES);
             specialtyCombo.getItems().addAll(refs.specialties());
@@ -225,7 +251,15 @@ public class BookingForm extends VBox {
     }
 
     private record References(List<DoctorDto> doctors, List<SpecialtyDto> specialties, List<ServiceDto> services,
-                              List<PatientDto> patients) {
+                              List<PatientDto> patients, SettingsDto settings, List<HolidayDto> holidays) {
+    }
+
+    private LocalDate lastBookableDay() {
+        return LocalDate.now().plusDays(horizonDays);
+    }
+
+    private boolean bookable(LocalDate day) {
+        return !day.isBefore(LocalDate.now()) && !day.isAfter(lastBookableDay()) && !holidays.containsKey(day);
     }
 
     private void filterPatients(String query) {
@@ -255,7 +289,10 @@ public class BookingForm extends VBox {
 
     private void shiftDate(int days) {
         LocalDate next = datePicker.getValue().plusDays(days);
-        if (!next.isBefore(LocalDate.now())) {
+        while (holidays.containsKey(next)) {
+            next = next.plusDays(days);
+        }
+        if (bookable(next)) {
             datePicker.setValue(next);
         }
     }
@@ -290,8 +327,17 @@ public class BookingForm extends VBox {
     private void showSlots(List<SlotDto> slots) {
         clearSlots();
         if (slots.isEmpty()) {
-            showSlotsHint("Нет свободного времени на " + Formats.date(datePicker.getValue())
-                    + ". Выберите другую дату или нажмите «Найти ближайшее окно».");
+            LocalDate date = datePicker.getValue();
+            if (holidays.containsKey(date)) {
+                showSlotsHint(Formats.date(date) + " — нерабочий день клиники («" + holidays.get(date)
+                        + "»). Выберите другую дату или нажмите «Найти ближайшее окно».");
+            } else if (date.isAfter(lastBookableDay())) {
+                showSlotsHint("Запись открыта до " + Formats.date(lastBookableDay())
+                        + ". Выберите более раннюю дату.");
+            } else {
+                showSlotsHint("Нет свободного времени на " + Formats.date(date)
+                        + ". Выберите другую дату или нажмите «Найти ближайшее окно».");
+            }
             return;
         }
         slotsInfo.setText("Свободно окон: " + slots.size());

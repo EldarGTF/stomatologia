@@ -478,6 +478,54 @@
     -fx-border-color: -color-primary;
 }
 
+/* ---------- Настройки ---------- */
+
+.settings-tabs > .tab-header-area {
+    -fx-padding: 0 0 8 0;
+}
+
+.settings-tabs > .tab-header-area > .tab-header-background {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent transparent -color-border transparent;
+}
+
+.settings-tabs .tab {
+    -fx-background-color: transparent;
+    -fx-padding: 8 16 8 16;
+    -fx-background-insets: 0;
+    -fx-border-color: transparent;
+    -fx-border-width: 0 0 3 0;
+}
+
+.settings-tabs .tab .tab-label {
+    -fx-text-fill: -color-muted;
+    -fx-font-size: 13px;
+}
+
+.settings-tabs .tab:selected {
+    -fx-border-color: transparent transparent -color-primary transparent;
+}
+
+.settings-tabs .tab:selected .tab-label {
+    -fx-text-fill: -color-primary;
+    -fx-font-weight: bold;
+}
+
+.settings-tabs .tab:selected .focus-indicator {
+    -fx-border-color: transparent;
+}
+
+.settings-grid {
+    -fx-hgap: 16;
+    -fx-vgap: 12;
+    -fx-alignment: top-left;
+}
+
+.date-cell.holiday-cell {
+    -fx-text-fill: -color-danger;
+    -fx-background-color: -color-danger-soft;
+}
+
 .scroll-pane {
     -fx-background-color: transparent;
     -fx-background: transparent;

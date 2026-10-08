@@ -30,6 +30,14 @@ class ScreenTest {
     }
 
     @Test
+    void clinicSettingsOnlyForAdmin() {
+        assertThat(Screen.SETTINGS.allowedFor(Role.ADMIN)).isTrue();
+        assertThat(Screen.SETTINGS.allowedFor(Role.REGISTRAR)).isFalse();
+        assertThat(Screen.SETTINGS.allowedFor(Role.DOCTOR)).isFalse();
+        assertThat(Screen.SETTINGS.allowedFor(Role.PATIENT)).isFalse();
+    }
+
+    @Test
     void patientWorkplace() {
         assertThat(allowed(Role.PATIENT)).containsExactly(
                 Screen.DOCTORS, Screen.BOOKING, Screen.APPOINTMENTS, Screen.SERVICES, Screen.PAYMENTS);

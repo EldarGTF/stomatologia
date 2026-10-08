@@ -9,6 +9,7 @@ import com.stomatologia.backend.domain.User;
 import com.stomatologia.backend.repository.AppointmentRepository;
 import com.stomatologia.backend.repository.InvoiceRepository;
 import com.stomatologia.backend.repository.UserRepository;
+import com.stomatologia.backend.service.ClinicSettingsService;
 import com.stomatologia.backend.service.InvoiceService;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -38,12 +39,14 @@ public class DemoBillingInitializer implements ApplicationRunner {
     private final InvoiceRepository invoices;
     private final AppointmentRepository appointments;
     private final UserRepository users;
+    private final ClinicSettingsService clinic;
 
     public DemoBillingInitializer(InvoiceRepository invoices, AppointmentRepository appointments,
-                                  UserRepository users) {
+                                  UserRepository users, ClinicSettingsService clinic) {
         this.invoices = invoices;
         this.appointments = appointments;
         this.users = users;
+        this.clinic = clinic;
     }
 
     @Override
@@ -54,10 +57,11 @@ public class DemoBillingInitializer implements ApplicationRunner {
         }
         Random random = new Random(7);
         User registrar = users.findByUsername("registrar").orElse(null);
+        String prefix = clinic.current().getInvoicePrefix();
         int count = 0;
         for (Appointment a : appointments.findAll(Sort.by("startAt"))) {
             if (a.getStatus() == AppointmentStatus.COMPLETED) {
-                Invoice invoice = invoice(a, a.getEndAt());
+                Invoice invoice = invoice(a, a.getEndAt(), prefix);
                 int roll = random.nextInt(100);
                 if (roll < 82) {
                     pay(invoice, invoice.getAmount(), a.getEndAt().plusMinutes(5 + random.nextInt(15)), random,
@@ -69,7 +73,7 @@ public class DemoBillingInitializer implements ApplicationRunner {
                 save(invoice);
                 count++;
             } else if (a.getStatus() == AppointmentStatus.SCHEDULED && random.nextInt(100) < 15) {
-                Invoice invoice = invoice(a, a.getCreatedAt());
+                Invoice invoice = invoice(a, a.getCreatedAt(), prefix);
                 if (random.nextBoolean()) {
                     pay(invoice, invoice.getAmount(), a.getCreatedAt().plusMinutes(3), random, registrar);
                 }
@@ -80,12 +84,12 @@ public class DemoBillingInitializer implements ApplicationRunner {
         log.info("Создано демонстрационных счетов: {}", count);
     }
 
-    private static Invoice invoice(Appointment a, LocalDateTime issuedAt) {
+    private static Invoice invoice(Appointment a, LocalDateTime issuedAt, String prefix) {
         Invoice invoice = new Invoice();
         invoice.setAppointment(a);
         invoice.setAmount(a.getService().getPrice());
         invoice.setIssuedAt(issuedAt);
-        invoice.setNumber(InvoiceService.number(issuedAt, a.getId()));
+        invoice.setNumber(InvoiceService.number(prefix, issuedAt, a.getId()));
         return invoice;
     }
 

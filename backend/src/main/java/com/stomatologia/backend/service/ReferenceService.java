@@ -9,6 +9,8 @@ import com.stomatologia.backend.dto.RoomDtos.RoomDto;
 import com.stomatologia.backend.dto.RoomDtos.RoomRequest;
 import com.stomatologia.backend.repository.RoomRepository;
 import com.stomatologia.backend.repository.SpecialtyRepository;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
@@ -21,6 +23,8 @@ import java.util.List;
  */
 @Service
 public class ReferenceService {
+
+    private static final Logger log = LogManager.getLogger(ReferenceService.class);
 
     private final RoomRepository rooms;
     private final SpecialtyRepository specialties;
@@ -47,7 +51,9 @@ public class ReferenceService {
                 : rooms.findById(id).orElseThrow(() -> ApiException.notFound("Кабинет не найден"));
         room.setNumber(number);
         room.setName(request.name().trim());
-        return RoomDto.from(rooms.save(room));
+        room = rooms.save(room);
+        log.info("Кабинет № {} «{}» {}", room.getNumber(), room.getName(), id == null ? "добавлен" : "изменён");
+        return RoomDto.from(room);
     }
 
     @Transactional
@@ -57,8 +63,10 @@ public class ReferenceService {
             rooms.delete(room);
             rooms.flush();
         } catch (DataIntegrityViolationException e) {
-            throw ApiException.conflict("Кабинет используется в приёмах — удалить нельзя");
+            throw ApiException.conflict("Кабинет № " + room.getNumber()
+                    + " закреплён за врачом или используется в приёмах — удалить нельзя");
         }
+        log.info("Удалён кабинет № {} «{}»", room.getNumber(), room.getName());
     }
 
     @Transactional(readOnly = true)
@@ -80,6 +88,7 @@ public class ReferenceService {
                 : specialties.findById(id).orElseThrow(() -> ApiException.notFound("Специальность не найдена"));
         s.setName(name);
         s = specialties.save(s);
+        log.info("Специальность «{}» {}", s.getName(), id == null ? "добавлена" : "изменена");
         return new SpecialtyDto(s.getId(), s.getName());
     }
 
@@ -90,7 +99,8 @@ public class ReferenceService {
             specialties.delete(s);
             specialties.flush();
         } catch (DataIntegrityViolationException e) {
-            throw ApiException.conflict("Есть врачи с этой специальностью — удалить нельзя");
+            throw ApiException.conflict("Есть врачи со специальностью «" + s.getName() + "» — удалить нельзя");
         }
+        log.info("Удалена специальность «{}»", s.getName());
     }
 }

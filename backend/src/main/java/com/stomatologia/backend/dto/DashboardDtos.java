@@ -11,10 +11,11 @@ public final class DashboardDtos {
     private DashboardDtos() {
     }
 
+    /** holidayName — название праздника, если сегодня нерабочий день клиники, иначе null. */
     public record DashboardDto(LocalDate date, int appointmentsToday, int scheduled, int completed, int noShow,
                                int cancelled, int awaitingMark, int freeWindows, int windowMinutes, BigDecimal revenueToday,
                                BigDecimal revenueMonth, BigDecimal outstanding, List<DayRevenue> revenueByDay,
-                               List<DoctorLoad> doctorLoad, List<AppointmentDto> upcoming) {
+                               List<DoctorLoad> doctorLoad, List<AppointmentDto> upcoming, String holidayName) {
     }
 
     public record DayRevenue(LocalDate date, BigDecimal amount) {

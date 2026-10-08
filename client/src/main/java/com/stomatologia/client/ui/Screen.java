@@ -22,7 +22,8 @@ public enum Screen {
     APPOINTMENTS("Приёмы", "appointments", ADMIN, REGISTRAR, DOCTOR, PATIENT),
     SERVICES("Услуги", "services", ADMIN, REGISTRAR, DOCTOR, PATIENT),
     PAYMENTS("Оплата", "payments", ADMIN, REGISTRAR, PATIENT),
-    REPORTS("Отчёты", "reports", ADMIN, REGISTRAR);
+    REPORTS("Отчёты", "reports", ADMIN, REGISTRAR),
+    SETTINGS("Настройки", "settings", ADMIN);
 
     private final String title;
     private final String view;

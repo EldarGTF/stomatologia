@@ -3,6 +3,7 @@ package com.stomatologia.backend.service;
 import com.stomatologia.backend.domain.Appointment;
 import com.stomatologia.backend.domain.AppointmentStatus;
 import com.stomatologia.backend.domain.Doctor;
+import com.stomatologia.backend.domain.Holiday;
 import com.stomatologia.backend.domain.Invoice;
 import com.stomatologia.backend.domain.InvoiceStatus;
 import com.stomatologia.backend.domain.Payment;
@@ -49,14 +50,17 @@ public class DashboardService {
     private final ScheduleRepository schedules;
     private final PaymentRepository payments;
     private final InvoiceRepository invoices;
+    private final ClinicSettingsService clinic;
 
     public DashboardService(AppointmentRepository appointments, DoctorRepository doctors,
-                            ScheduleRepository schedules, PaymentRepository payments, InvoiceRepository invoices) {
+                            ScheduleRepository schedules, PaymentRepository payments, InvoiceRepository invoices,
+                            ClinicSettingsService clinic) {
         this.appointments = appointments;
         this.doctors = doctors;
         this.schedules = schedules;
         this.payments = payments;
         this.invoices = invoices;
+        this.clinic = clinic;
     }
 
     @Transactional(readOnly = true)
@@ -76,7 +80,8 @@ public class DashboardService {
                 .filter(a -> a.getStatus() == AppointmentStatus.SCHEDULED && !a.getEndAt().isAfter(now))
                 .count();
 
-        List<DoctorLoad> load = doctorLoad(today, active, now);
+        String holidayName = clinic.holiday(today).map(Holiday::getName).orElse(null);
+        List<DoctorLoad> load = doctorLoad(today, active, now, holidayName != null);
         int freeWindows = load.stream().mapToInt(DoctorLoad::freeWindows).sum();
 
         BigDecimal revenueToday = payments.sumBetween(dayStart, dayEnd);
@@ -93,10 +98,12 @@ public class DashboardService {
 
         return new DashboardDto(today, active.size(), scheduled, completed, noShow, cancelled, awaitingMark,
                 freeWindows,
-                WINDOW_MINUTES, revenueToday, revenueMonth, outstanding, revenueByDay(today), load, upcoming);
+                WINDOW_MINUTES, revenueToday, revenueMonth, outstanding, revenueByDay(today), load, upcoming,
+                holidayName);
     }
 
-    private List<DoctorLoad> doctorLoad(LocalDate date, List<Appointment> active, LocalDateTime now) {
+    private List<DoctorLoad> doctorLoad(LocalDate date, List<Appointment> active, LocalDateTime now,
+                                        boolean holiday) {
         Map<Long, Schedule> scheduleByDoctor = schedules.findAllWithDoctor().stream()
                 .filter(s -> s.getDayOfWeek() == date.getDayOfWeek().getValue())
                 .collect(Collectors.toMap(s -> s.getDoctor().getId(), Function.identity()));
@@ -108,7 +115,7 @@ public class DashboardService {
             List<Appointment> own = active.stream().filter(a -> a.getDoctor().getId().equals(d.getId())).toList();
             Schedule s = scheduleByDoctor.get(d.getId());
             String room = d.getRoom() != null ? d.getRoom().getNumber() : null;
-            if (s == null) {
+            if (s == null || holiday) {
                 result.add(new DoctorLoad(d.getId(), d.getFullName(), d.getSpecialty().getName(), room,
                         false, 0, 0, own.size(), 0, 0));
                 continue;

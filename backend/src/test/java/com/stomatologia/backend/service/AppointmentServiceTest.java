@@ -5,7 +5,9 @@ import com.stomatologia.backend.domain.Appointment;
 import com.stomatologia.backend.domain.AppointmentStatus;
 import com.stomatologia.backend.domain.AuditAction;
 import com.stomatologia.backend.domain.ClinicService;
+import com.stomatologia.backend.domain.ClinicSettings;
 import com.stomatologia.backend.domain.Doctor;
+import com.stomatologia.backend.domain.Holiday;
 import com.stomatologia.backend.domain.Patient;
 import com.stomatologia.backend.domain.Role;
 import com.stomatologia.backend.domain.Room;
@@ -35,6 +37,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
@@ -75,6 +78,8 @@ class AppointmentServiceTest {
     private ServiceCatalogService catalog;
     @Mock
     private InvoiceService invoices;
+    @Mock
+    private ClinicSettingsService clinic;
 
     @InjectMocks
     private AppointmentService service;
@@ -82,10 +87,18 @@ class AppointmentServiceTest {
     private Doctor doctor;
     private Patient patient;
     private ClinicService treatment;
+    private ClinicSettings settings;
     private LocalDateTime nextWeek;
+    private LocalDateTime tomorrow;
 
     @BeforeEach
     void setUp() {
+        settings = new ClinicSettings();
+        settings.setPhone("+7 (7182) 00-00-00");
+        when(clinic.current()).thenReturn(settings);
+        when(clinic.holiday(any())).thenReturn(Optional.empty());
+        loginAs(Role.REGISTRAR, null, null);
+
         Room room = new Room();
         room.setId(1L);
         room.setNumber("101");
@@ -116,6 +129,7 @@ class AppointmentServiceTest {
         when(schedules.findByDoctorIdAndDayOfWeek(eq(DOCTOR_ID), anyInt())).thenReturn(Optional.of(schedule));
 
         nextWeek = LocalDateTime.now().plusDays(7).withHour(10).withMinute(0).withSecond(0).withNano(0);
+        tomorrow = LocalDate.now().plusDays(1).atTime(10, 0);
     }
 
     @AfterEach
@@ -214,6 +228,101 @@ class AppointmentServiceTest {
 
             verify(appointments).findDoctorOverlaps(DOCTOR_ID, a.getStartAt(), a.getEndAt(), 42L);
             verify(appointments).findRoomOverlaps(1L, a.getStartAt(), a.getEndAt(), 42L);
+        }
+    }
+
+    @Nested
+    @DisplayName("Правила из настроек клиники")
+    class ClinicRules {
+
+        @Test
+        void holidayIsRejected() {
+            Holiday holiday = new Holiday();
+            holiday.setDay(nextWeek.toLocalDate());
+            holiday.setName("День Республики");
+            when(clinic.holiday(nextWeek.toLocalDate())).thenReturn(Optional.of(holiday));
+
+            assertThatThrownBy(() -> service.ensureBookable(appointment(nextWeek), null))
+                    .hasMessageContaining("нерабочий день")
+                    .hasMessageContaining("День Республики")
+                    .satisfies(ex -> assertThat(statusOf(ex)).isEqualTo(HttpStatus.BAD_REQUEST));
+        }
+
+        @Test
+        void dateBeyondBookingHorizonIsRejected() {
+            settings.setBookingHorizonDays(5);
+
+            assertThatThrownBy(() -> service.ensureBookable(appointment(nextWeek), null))
+                    .hasMessageContaining("Запись открыта на 5 дн. вперёд")
+                    .satisfies(ex -> assertThat(statusOf(ex)).isEqualTo(HttpStatus.BAD_REQUEST));
+        }
+
+        @Test
+        void patientCannotBookLaterThanMinimumLeadTime() {
+            loginAs(Role.PATIENT, null, PATIENT_ID);
+            settings.setMinLeadHours(48);
+
+            assertThatThrownBy(() -> service.ensureBookable(appointment(tomorrow), null))
+                    .hasMessageContaining("не позднее чем за 48 ч")
+                    .hasMessageContaining(settings.getPhone());
+        }
+
+        @Test
+        void registrarIsNotLimitedByLeadTime() {
+            settings.setMinLeadHours(48);
+
+            assertThatCode(() -> service.ensureBookable(appointment(tomorrow), null)).doesNotThrowAnyException();
+        }
+
+        @Test
+        void patientCannotCancelShortlyBeforeVisit() {
+            loginAs(Role.PATIENT, null, PATIENT_ID);
+            settings.setPatientCancelHours(24);
+            Appointment a = appointment(LocalDateTime.now().plusHours(3));
+            when(appointments.findById(1L)).thenReturn(Optional.of(a));
+
+            assertThatThrownBy(() -> service.cancel(1L, null))
+                    .hasMessageContaining("Отменить запись онлайн можно не позднее чем за 24 ч")
+                    .satisfies(ex -> assertThat(statusOf(ex)).isEqualTo(HttpStatus.CONFLICT));
+            assertThat(a.getStatus()).isEqualTo(AppointmentStatus.SCHEDULED);
+        }
+
+        @Test
+        void patientCanCancelInAdvance() {
+            loginAs(Role.PATIENT, null, PATIENT_ID);
+            settings.setPatientCancelHours(24);
+            Appointment a = appointment(nextWeek);
+            when(appointments.findById(1L)).thenReturn(Optional.of(a));
+
+            service.cancel(1L, null);
+
+            assertThat(a.getStatus()).isEqualTo(AppointmentStatus.CANCELLED);
+        }
+
+        @Test
+        void expensiveServiceGetsInvoiceAtBooking() {
+            settings.setPrepaymentThreshold(new BigDecimal("20000"));
+            stubBookingLookups();
+
+            service.create(new AppointmentRequest(PATIENT_ID, DOCTOR_ID, 5L, nextWeek, null));
+
+            verify(invoices).onBookedWithPrepayment(any());
+        }
+
+        @Test
+        void cheapServiceIsBookedWithoutInvoice() {
+            settings.setPrepaymentThreshold(new BigDecimal("50000"));
+            stubBookingLookups();
+
+            service.create(new AppointmentRequest(PATIENT_ID, DOCTOR_ID, 5L, nextWeek, null));
+
+            verify(invoices, never()).onBookedWithPrepayment(any());
+        }
+
+        private void stubBookingLookups() {
+            when(patients.findById(PATIENT_ID)).thenReturn(Optional.of(patient));
+            when(doctors.findById(DOCTOR_ID)).thenReturn(Optional.of(doctor));
+            when(catalog.find(5L)).thenReturn(treatment);
         }
     }
 

@@ -2,6 +2,7 @@ package com.stomatologia.backend.report;
 
 import com.stomatologia.backend.domain.Appointment;
 import com.stomatologia.backend.domain.ClinicService;
+import com.stomatologia.backend.domain.ClinicSettings;
 import com.stomatologia.backend.domain.Doctor;
 import com.stomatologia.backend.domain.Invoice;
 import com.stomatologia.backend.domain.Patient;
@@ -30,8 +31,16 @@ class ReportGeneratorsTest {
 
     private static final LocalDate DAY = LocalDate.of(2026, 10, 5);
 
-    private final WordDocuments word = new WordDocuments("Клиника «Улыбка»", "ул. Центральная, 1", "+7 900 000-00-00");
+    private final WordDocuments word = new WordDocuments();
     private final ExcelReports excel = new ExcelReports();
+
+    private static ClinicSettings clinic() {
+        ClinicSettings clinic = new ClinicSettings();
+        clinic.setName("Клиника «Улыбка»");
+        clinic.setAddress("г. Павлодар, ул. Сатпаева, д. 1");
+        clinic.setPhone("+7 (7182) 00-00-00");
+        return clinic;
+    }
 
     private static Appointment appointment() {
         Specialty specialty = new Specialty();
@@ -88,18 +97,42 @@ class ReportGeneratorsTest {
 
     @Test
     void ticketContainsAppointmentDetails() throws IOException {
-        String text = text(word.ticket(appointment(), "Козлова Марина"));
+        String text = text(word.ticket(appointment(), clinic(), "Козлова Марина"));
 
-        assertThat(text).contains("ТАЛОН НА ПРИЁМ № 000042", "Алексеев Игорь", "Иванова Елена Петровна",
-                "05.10.2026 10:00–11:00", "№ 101", "Лечение кариеса", "5 500,00 ₸", "Козлова Марина");
+        assertThat(text).contains("Клиника «Улыбка»", "г. Павлодар", "ТАЛОН НА ПРИЁМ № 000042", "Алексеев Игорь",
+                "Иванова Елена Петровна", "05.10.2026 10:00–11:00", "№ 101", "Лечение кариеса", "5 500,00 ₸",
+                "Козлова Марина", "не позднее чем за 24 ч до приёма");
     }
 
     @Test
     void invoiceContainsAmountInWordsAndPayments() throws IOException {
-        String text = text(word.invoice(paidInvoice(appointment()), "Козлова Марина"));
+        String text = text(word.invoice(paidInvoice(appointment()), clinic(), "Козлова Марина"));
 
         assertThat(text).contains("СЧЁТ № СЧ-20261005-000042", "Пять тысяч пятьсот тенге 00 тиын",
-                "Оплачен", "Банковская карта");
+                "Оплачен", "Банковская карта")
+                .doesNotContain("НДС", "Получатель");
+    }
+
+    @Test
+    void invoiceShowsBankRequisitesAndVatFromSettings() throws IOException {
+        ClinicSettings clinic = clinic();
+        clinic.setBin("123456789012");
+        clinic.setIik("KZ12345678901234567890");
+        clinic.setBankName("АО «Халык Банк»");
+        clinic.setBik("HSBKKZKX");
+        clinic.setVatEnabled(true);
+        clinic.setVatRate(new BigDecimal("12"));
+
+        String text = text(word.invoice(paidInvoice(appointment()), clinic, "Козлова Марина"));
+
+        assertThat(text).contains("БИН 123456789012", "ИИК KZ12345678901234567890", "АО «Халык Банк»",
+                "БИК HSBKKZKX", "в т.ч. НДС 12%", "589,29 ₸");
+    }
+
+    @Test
+    void vatIsExtractedFromAmountIncludingIt() {
+        assertThat(WordDocuments.vatIncluded(new BigDecimal("11200"), new BigDecimal("12")))
+                .isEqualByComparingTo("1200.00");
     }
 
     @Test

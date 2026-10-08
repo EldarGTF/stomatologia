@@ -4,6 +4,7 @@ import com.stomatologia.backend.common.ApiException;
 import com.stomatologia.backend.domain.Appointment;
 import com.stomatologia.backend.domain.AppointmentStatus;
 import com.stomatologia.backend.domain.ClinicService;
+import com.stomatologia.backend.domain.ClinicSettings;
 import com.stomatologia.backend.domain.Doctor;
 import com.stomatologia.backend.domain.Invoice;
 import com.stomatologia.backend.domain.InvoiceStatus;
@@ -22,6 +23,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -53,14 +55,20 @@ class InvoiceServiceTest {
     private AppointmentRepository appointments;
     @Mock
     private UserRepository users;
+    @Mock
+    private ClinicSettingsService clinic;
 
     @InjectMocks
     private InvoiceService service;
 
     private Invoice invoice;
+    private ClinicSettings settings;
 
     @BeforeEach
     void setUp() {
+        settings = new ClinicSettings();
+        when(clinic.current()).thenReturn(settings);
+
         AuthUser registrar = new AuthUser(2L, "registrar", "Козлова Марина Сергеевна", Role.REGISTRAR, null, null);
         SecurityContextHolder.getContext()
                 .setAuthentication(new UsernamePasswordAuthenticationToken(registrar, null, List.of()));
@@ -73,6 +81,7 @@ class InvoiceServiceTest {
         doctor.setFullName("Иванова Елена Петровна");
         ClinicService treatment = new ClinicService();
         treatment.setName("Лечение кариеса");
+        treatment.setPrice(new BigDecimal("27500.00"));
         Appointment visit = new Appointment();
         visit.setId(42L);
         visit.setPatient(patient);
@@ -191,8 +200,33 @@ class InvoiceServiceTest {
     }
 
     @Test
-    void invoiceNumberContainsDateAndAppointment() {
-        assertThat(InvoiceService.number(LocalDateTime.of(2026, 10, 5, 14, 30), 42L))
+    void invoiceNumberContainsPrefixDateAndAppointment() {
+        assertThat(InvoiceService.number("СЧ", LocalDateTime.of(2026, 10, 5, 14, 30), 42L))
                 .isEqualTo("СЧ-20261005-000042");
+    }
+
+    @Test
+    void prepaymentInvoiceUsesPrefixFromSettings() {
+        settings.setInvoicePrefix("УЛ");
+        Appointment a = invoice.getAppointment();
+        when(invoices.findByAppointmentId(42L)).thenReturn(Optional.empty());
+        when(invoices.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        service.onBookedWithPrepayment(a);
+
+        ArgumentCaptor<Invoice> saved = ArgumentCaptor.forClass(Invoice.class);
+        verify(invoices).saveAndFlush(saved.capture());
+        assertThat(saved.getValue().getNumber()).startsWith("УЛ-").endsWith("-000042");
+        assertThat(saved.getValue().getAmount()).isEqualByComparingTo("27500");
+        assertThat(saved.getValue().getStatus()).isEqualTo(InvoiceStatus.UNPAID);
+    }
+
+    @Test
+    void prepaymentDoesNotDuplicateExistingInvoice() {
+        when(invoices.findByAppointmentId(42L)).thenReturn(Optional.of(invoice));
+
+        service.onBookedWithPrepayment(invoice.getAppointment());
+
+        verify(invoices, never()).saveAndFlush(any());
     }
 }
