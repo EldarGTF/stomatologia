@@ -1,7 +1,10 @@
 package com.stomatologia.client.ui;
 
+import com.stomatologia.client.api.ApiException;
 import javafx.application.Platform;
 import javafx.concurrent.Task;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
@@ -12,6 +15,8 @@ import java.util.function.Consumer;
  * Выполнение запросов к серверу в фоне, чтобы окно не «зависало». Ошибки показываются через Alert.
  */
 public final class Fx {
+
+    private static final Logger log = LogManager.getLogger(Fx.class);
 
     private static final ExecutorService EXECUTOR = Executors.newCachedThreadPool(r -> {
         Thread t = new Thread(r, "api-call");
@@ -40,6 +45,9 @@ public final class Fx {
         });
         task.setOnFailed(e -> {
             Throwable ex = task.getException();
+            if (!(ex instanceof ApiException)) {
+                log.error("Ошибка фоновой операции", ex);
+            }
             if (onError != null) {
                 onError.accept(ex);
             } else {

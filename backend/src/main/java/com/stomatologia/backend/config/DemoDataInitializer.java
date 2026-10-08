@@ -11,8 +11,8 @@ import com.stomatologia.backend.repository.RoomRepository;
 import com.stomatologia.backend.repository.ScheduleRepository;
 import com.stomatologia.backend.repository.SpecialtyRepository;
 import com.stomatologia.backend.repository.UserRepository;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -32,7 +32,7 @@ import java.time.LocalTime;
 @ConditionalOnProperty(name = "app.demo-data", havingValue = "true")
 public class DemoDataInitializer implements ApplicationRunner {
 
-    private static final Logger log = LoggerFactory.getLogger(DemoDataInitializer.class);
+    private static final Logger log = LogManager.getLogger(DemoDataInitializer.class);
 
     private final UserRepository users;
     private final DoctorRepository doctors;

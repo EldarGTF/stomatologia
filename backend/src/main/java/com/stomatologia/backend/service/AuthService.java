@@ -10,6 +10,8 @@ import com.stomatologia.backend.repository.PatientRepository;
 import com.stomatologia.backend.repository.UserRepository;
 import com.stomatologia.backend.security.AuthUser;
 import com.stomatologia.backend.security.JwtService;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -17,6 +19,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class AuthService {
+
+    private static final Logger log = LogManager.getLogger(AuthService.class);
 
     private final UserRepository users;
     private final DoctorRepository doctors;
@@ -35,12 +39,18 @@ public class AuthService {
 
     @Transactional(readOnly = true)
     public LoginResponse login(LoginRequest request) {
-        User user = users.findByUsername(request.username().trim())
+        String username = request.username().trim();
+        User user = users.findByUsername(username)
                 .filter(u -> encoder.matches(request.password(), u.getPasswordHash()))
-                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Неверный логин или пароль"));
+                .orElseThrow(() -> {
+                    log.warn("Неудачная попытка входа: логин «{}»", username);
+                    return new ApiException(HttpStatus.UNAUTHORIZED, "Неверный логин или пароль");
+                });
         if (!user.isActive()) {
+            log.warn("Попытка входа в заблокированную учётную запись «{}»", username);
             throw new ApiException(HttpStatus.UNAUTHORIZED, "Учётная запись заблокирована");
         }
+        log.info("Вход в систему: {} ({}, {})", user.getUsername(), user.getFullName(), user.getRole());
         Long doctorId = doctors.findByUserId(user.getId()).map(d -> d.getId()).orElse(null);
         Long patientId = patients.findByUserId(user.getId()).map(p -> p.getId()).orElse(null);
         AuthUser authUser = new AuthUser(user.getId(), user.getUsername(), user.getFullName(), user.getRole(),

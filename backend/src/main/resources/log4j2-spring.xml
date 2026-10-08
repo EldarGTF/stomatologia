@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Логирование сервера: консоль, общий журнал и отдельный журнал предупреждений и ошибок.
+     Каталог журналов задаётся переменной окружения LOG_DIR (по умолчанию logs/ в рабочем каталоге). -->
+<Configuration status="WARN">
+    <Properties>
+        <Property name="logDir">${env:LOG_DIR:-logs}</Property>
+        <Property name="PATTERN">%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%15.15t] %-40.40c{1.} : %msg%n%throwable</Property>
+    </Properties>
+
+    <Appenders>
+        <Console name="Console" target="SYSTEM_OUT">
+            <PatternLayout pattern="${PATTERN}" charset="UTF-8"/>
+        </Console>
+
+        <RollingFile name="AppFile" fileName="${logDir}/backend.log"
+                     filePattern="${logDir}/backend-%d{yyyy-MM-dd}-%i.log.gz">
+            <PatternLayout pattern="${PATTERN}" charset="UTF-8"/>
+            <Policies>
+                <TimeBasedTriggeringPolicy/>
+                <SizeBasedTriggeringPolicy size="10 MB"/>
+            </Policies>
+            <DefaultRolloverStrategy max="14"/>
+        </RollingFile>
+
+        <RollingFile name="ErrorFile" fileName="${logDir}/errors.log"
+                     filePattern="${logDir}/errors-%d{yyyy-MM-dd}-%i.log.gz">
+            <ThresholdFilter level="WARN" onMatch="ACCEPT" onMismatch="DENY"/>
+            <PatternLayout pattern="${PATTERN}" charset="UTF-8"/>
+            <Policies>
+                <TimeBasedTriggeringPolicy/>
+                <SizeBasedTriggeringPolicy size="10 MB"/>
+            </Policies>
+            <DefaultRolloverStrategy max="30"/>
+        </RollingFile>
+    </Appenders>
+
+    <Loggers>
+        <Logger name="com.stomatologia" level="INFO"/>
+        <Logger name="org.hibernate.SQL" level="WARN"/>
+        <Logger name="org.hibernate.orm.deprecation" level="ERROR"/>
+        <Logger name="org.apache.catalina" level="WARN"/>
+        <Logger name="org.apache.coyote" level="WARN"/>
+
+        <Root level="INFO">
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="AppFile"/>
+            <AppenderRef ref="ErrorFile"/>
+        </Root>
+    </Loggers>
+</Configuration>

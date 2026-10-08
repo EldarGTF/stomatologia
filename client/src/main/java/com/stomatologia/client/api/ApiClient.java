@@ -6,6 +6,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
 import java.net.ConnectException;
@@ -24,6 +26,8 @@ import java.util.stream.Collectors;
  * HTTP-клиент REST API сервера. Добавляет JWT текущей сессии и превращает ошибки сервера в {@link ApiException}.
  */
 public final class ApiClient {
+
+    private static final Logger log = LogManager.getLogger(ApiClient.class);
 
     private static final ApiClient INSTANCE = new ApiClient(System.getProperty("api.url", "http://localhost:8080"));
 
@@ -113,20 +117,29 @@ public final class ApiClient {
 
     private HttpResponse<byte[]> send(HttpRequest.Builder builder) {
         HttpRequest request = builder.header("Content-Type", "application/json; charset=UTF-8").build();
+        String call = request.method() + " " + request.uri().getRawPath()
+                + (request.uri().getRawQuery() != null ? "?" + request.uri().getRawQuery() : "");
+        long started = System.nanoTime();
         HttpResponse<byte[]> response;
         try {
             response = http.send(request, HttpResponse.BodyHandlers.ofByteArray());
         } catch (ConnectException e) {
+            log.error("{}: сервер {} недоступен", call, baseUrl);
             throw new ApiException(0, "Сервер недоступен (" + baseUrl + "). Убедитесь, что backend запущен.");
         } catch (IOException e) {
+            log.error("{}: ошибка связи с сервером", call, e);
             throw new ApiException(0, "Ошибка связи с сервером: " + e.getMessage());
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new ApiException(0, "Запрос прерван");
         }
+        long millis = (System.nanoTime() - started) / 1_000_000;
         if (response.statusCode() >= 400) {
-            throw new ApiException(response.statusCode(), errorMessage(response));
+            String message = errorMessage(response);
+            log.warn("{} -> {} ({} мс): {}", call, response.statusCode(), millis, message);
+            throw new ApiException(response.statusCode(), message);
         }
+        log.debug("{} -> {} ({} мс, {} байт)", call, response.statusCode(), millis, response.body().length);
         return response;
     }
 

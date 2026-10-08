@@ -3,6 +3,8 @@ package com.stomatologia.client.ui;
 import com.stomatologia.client.DentalClinicApp;
 import com.stomatologia.client.api.ApiClient;
 import javafx.stage.FileChooser;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.awt.Desktop;
 import java.io.File;
@@ -13,6 +15,8 @@ import java.nio.file.Files;
  * Сохранение документов и отчётов, сформированных сервером: выбор файла, загрузка и открытие в Word/Excel.
  */
 public final class Downloads {
+
+    private static final Logger log = LogManager.getLogger(Downloads.class);
 
     private static File lastDirectory;
 
@@ -42,7 +46,9 @@ public final class Downloads {
         }
         lastDirectory = target.getParentFile();
         Fx.async(() -> {
-            Files.write(target.toPath(), ApiClient.get().download(apiPath));
+            byte[] content = ApiClient.get().download(apiPath);
+            Files.write(target.toPath(), content);
+            log.info("Документ сохранён: {} ({} байт)", target.getAbsolutePath(), content.length);
             return open(target);
         }, opened -> {
             if (!opened) {
@@ -57,8 +63,8 @@ public final class Downloads {
                 Desktop.getDesktop().open(file);
                 return true;
             }
-        } catch (IOException | UnsupportedOperationException ignored) {
-            // нет программы для открытия файла — пользователю покажем путь
+        } catch (IOException | UnsupportedOperationException e) {
+            log.warn("Не удалось открыть {}: {}", file.getName(), e.getMessage());
         }
         return false;
     }

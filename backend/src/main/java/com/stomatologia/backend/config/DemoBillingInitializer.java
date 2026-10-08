@@ -10,8 +10,8 @@ import com.stomatologia.backend.repository.AppointmentRepository;
 import com.stomatologia.backend.repository.InvoiceRepository;
 import com.stomatologia.backend.repository.UserRepository;
 import com.stomatologia.backend.service.InvoiceService;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -33,7 +33,7 @@ import java.util.Random;
 @ConditionalOnProperty(name = "app.demo-data", havingValue = "true")
 public class DemoBillingInitializer implements ApplicationRunner {
 
-    private static final Logger log = LoggerFactory.getLogger(DemoBillingInitializer.class);
+    private static final Logger log = LogManager.getLogger(DemoBillingInitializer.class);
 
     private final InvoiceRepository invoices;
     private final AppointmentRepository appointments;

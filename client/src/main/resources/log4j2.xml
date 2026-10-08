@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Логирование клиента: консоль и журнал в домашнем каталоге пользователя (~/.stomatologia/logs). -->
+<Configuration status="WARN">
+    <Properties>
+        <Property name="logDir">${sys:user.home}/.stomatologia/logs</Property>
+        <Property name="PATTERN">%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%12.12t] %-30.30c{1.} : %msg%n%throwable</Property>
+    </Properties>
+
+    <Appenders>
+        <Console name="Console" target="SYSTEM_OUT">
+            <PatternLayout pattern="${PATTERN}" charset="UTF-8"/>
+        </Console>
+
+        <RollingFile name="File" fileName="${logDir}/client.log"
+                     filePattern="${logDir}/client-%d{yyyy-MM-dd}-%i.log.gz">
+            <PatternLayout pattern="${PATTERN}" charset="UTF-8"/>
+            <Policies>
+                <TimeBasedTriggeringPolicy/>
+                <SizeBasedTriggeringPolicy size="5 MB"/>
+            </Policies>
+            <DefaultRolloverStrategy max="7"/>
+        </RollingFile>
+    </Appenders>
+
+    <Loggers>
+        <!-- DEBUG — каждый запрос к серверу с кодом ответа и временем выполнения -->
+        <Logger name="com.stomatologia.client.api" level="DEBUG"/>
+        <Logger name="com.stomatologia" level="INFO"/>
+
+        <Root level="WARN">
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="File"/>
+        </Root>
+    </Loggers>
+</Configuration>

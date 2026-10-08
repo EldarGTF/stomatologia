@@ -16,8 +16,8 @@ import com.stomatologia.backend.repository.DoctorRepository;
 import com.stomatologia.backend.repository.PatientRepository;
 import com.stomatologia.backend.repository.ScheduleRepository;
 import com.stomatologia.backend.repository.UserRepository;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -41,7 +41,7 @@ import java.util.Random;
 @ConditionalOnProperty(name = "app.demo-data", havingValue = "true")
 public class DemoVisitsInitializer implements ApplicationRunner {
 
-    private static final Logger log = LoggerFactory.getLogger(DemoVisitsInitializer.class);
+    private static final Logger log = LogManager.getLogger(DemoVisitsInitializer.class);
     private static final int[] OFFSETS_MINUTES = {0, 90, 180, 300, 420};
 
     private final AppointmentRepository appointments;

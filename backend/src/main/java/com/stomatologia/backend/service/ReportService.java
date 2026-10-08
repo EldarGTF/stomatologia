@@ -17,6 +17,8 @@ import com.stomatologia.backend.repository.PaymentRepository;
 import com.stomatologia.backend.repository.ScheduleRepository;
 import com.stomatologia.backend.security.CurrentUser;
 import com.stomatologia.backend.service.SlotCalculator.Interval;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
@@ -38,6 +40,7 @@ import java.util.stream.Collectors;
 @Service
 public class ReportService {
 
+    private static final Logger log = LogManager.getLogger(ReportService.class);
     static final int MAX_PERIOD_DAYS = 366;
 
     private final AppointmentService appointmentService;
@@ -69,6 +72,7 @@ public class ReportService {
     public byte[] ticket(Long appointmentId) {
         Appointment a = appointmentService.find(appointmentId);
         AppointmentService.checkCanView(a, CurrentUser.get());
+        log.info("Талон на приём #{} сформирован (запросил {})", appointmentId, CurrentUser.get().username());
         return word.ticket(a, CurrentUser.get().fullName());
     }
 
@@ -76,6 +80,7 @@ public class ReportService {
     public byte[] invoice(Long invoiceId) {
         Invoice invoice = invoiceService.find(invoiceId);
         InvoiceService.checkCanView(invoice);
+        log.info("Счёт {} выгружен в Word (запросил {})", invoice.getNumber(), CurrentUser.get().username());
         return word.invoice(invoice, CurrentUser.get().fullName());
     }
 
@@ -126,6 +131,8 @@ public class ReportService {
                     count(own, AppointmentStatus.COMPLETED), count(own, AppointmentStatus.NO_SHOW),
                     count(own, AppointmentStatus.CANCELLED), daily));
         }
+        log.info("Отчёт «Загрузка врачей» за {} — {}: врачей {} (запросил {})", from, to, rows.size(),
+                CurrentUser.get().username());
         return excel.doctorLoad(from, to, rows);
     }
 
@@ -137,8 +144,10 @@ public class ReportService {
         BigDecimal invoiced = invoices.sumIssuedBetween(start, end);
         BigDecimal outstanding = invoices.findByStatusIn(List.of(InvoiceStatus.UNPAID, InvoiceStatus.PARTIAL))
                 .stream().map(Invoice::dueAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
-        return excel.revenue(from, to, payments.findByPaidAtGreaterThanEqualAndPaidAtLessThanOrderByPaidAt(start, end),
-                invoiced, outstanding);
+        var paid = payments.findByPaidAtGreaterThanEqualAndPaidAtLessThanOrderByPaidAt(start, end);
+        log.info("Отчёт «Выручка» за {} — {}: платежей {} (запросил {})", from, to, paid.size(),
+                CurrentUser.get().username());
+        return excel.revenue(from, to, paid, invoiced, outstanding);
     }
 
     private static void checkPeriod(LocalDate from, LocalDate to) {

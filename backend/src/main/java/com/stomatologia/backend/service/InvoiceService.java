@@ -15,6 +15,8 @@ import com.stomatologia.backend.repository.UserRepository;
 import com.stomatologia.backend.security.AuthUser;
 import com.stomatologia.backend.security.CurrentUser;
 import jakarta.persistence.criteria.Predicate;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
@@ -35,6 +37,7 @@ import java.util.Optional;
 @Service
 public class InvoiceService {
 
+    private static final Logger log = LogManager.getLogger(InvoiceService.class);
     private static final DateTimeFormatter NUMBER_DATE = DateTimeFormatter.ofPattern("yyyyMMdd");
 
     private final InvoiceRepository invoices;
@@ -119,6 +122,9 @@ public class InvoiceService {
         invoice.getPayments().add(payment);
         invoice.refreshStatus();
         invoices.saveAndFlush(invoice);
+        log.info("Оплата по счёту {}: {} ₸ ({}), остаток {} ₸, статус «{}» (принял {})", invoice.getNumber(),
+                r.amount().toPlainString(), r.method().title(), invoice.dueAmount().toPlainString(),
+                invoice.getStatus().title(), CurrentUser.get().username());
         return InvoiceDto.from(invoice);
     }
 
@@ -133,6 +139,7 @@ public class InvoiceService {
         }
         invoice.setStatus(InvoiceStatus.CANCELLED);
         invoices.saveAndFlush(invoice);
+        log.info("Счёт {} аннулирован вручную (аннулировал {})", invoice.getNumber(), CurrentUser.get().username());
         return InvoiceDto.from(invoice);
     }
 
@@ -147,7 +154,11 @@ public class InvoiceService {
     void onClosedWithoutVisit(Appointment a) {
         invoices.findByAppointmentId(a.getId())
                 .filter(i -> i.getStatus() != InvoiceStatus.CANCELLED && i.paidAmount().signum() == 0)
-                .ifPresent(i -> i.setStatus(InvoiceStatus.CANCELLED));
+                .ifPresent(i -> {
+                    i.setStatus(InvoiceStatus.CANCELLED);
+                    log.info("Счёт {} аннулирован: приём #{} в статусе «{}»", i.getNumber(), a.getId(),
+                            a.getStatus().title());
+                });
     }
 
     /** Сменилась услуга приёма — сумма открытого счёта следует за ценой новой услуги. */
@@ -160,6 +171,8 @@ public class InvoiceService {
                         throw ApiException.conflict("По счёту " + i.getNumber()
                                 + " уже оплачено больше стоимости новой услуги");
                     }
+                    log.info("Счёт {}: сумма {} ₸ -> {} ₸ после смены услуги", i.getNumber(),
+                            i.getAmount().toPlainString(), price.toPlainString());
                     i.setAmount(price);
                     i.refreshStatus();
                 });
@@ -172,7 +185,10 @@ public class InvoiceService {
         invoice.setIssuedAt(LocalDateTime.now());
         invoice.setNumber(number(invoice.getIssuedAt(), a.getId()));
         invoice.refreshStatus();
-        return invoices.saveAndFlush(invoice);
+        Invoice saved = invoices.saveAndFlush(invoice);
+        log.info("Выставлен счёт {} на {} ₸: приём #{}, пациент {}", saved.getNumber(),
+                saved.getAmount().toPlainString(), a.getId(), a.getPatient().getFullName());
+        return saved;
     }
 
     public static String number(LocalDateTime issuedAt, Long appointmentId) {

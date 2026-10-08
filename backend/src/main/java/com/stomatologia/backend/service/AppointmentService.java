@@ -22,6 +22,8 @@ import com.stomatologia.backend.repository.UserRepository;
 import com.stomatologia.backend.security.AuthUser;
 import com.stomatologia.backend.security.CurrentUser;
 import jakarta.persistence.criteria.Predicate;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
@@ -40,6 +42,7 @@ import java.util.Objects;
 @Service
 public class AppointmentService {
 
+    private static final Logger log = LogManager.getLogger(AppointmentService.class);
     private static final DateTimeFormatter DATE_TIME = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm");
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm");
 
@@ -129,7 +132,9 @@ public class AppointmentService {
         ensureBookable(a, null);
 
         appointments.saveAndFlush(a);
-        log(a, AuditAction.CREATE, null, describe(a), me);
+        writeAudit(a, AuditAction.CREATE, null, describe(a), me);
+        log.info("Запись #{} создана: пациент {}, {} (оформил {})", a.getId(), patient.getFullName(), describe(a),
+                me.username());
         return AppointmentDto.from(a);
     }
 
@@ -175,7 +180,9 @@ public class AppointmentService {
 
         String after = describe(a);
         if (!before.equals(after) || timeChanged) {
-            log(a, timeChanged ? AuditAction.RESCHEDULE : AuditAction.UPDATE, before, after, me);
+            writeAudit(a, timeChanged ? AuditAction.RESCHEDULE : AuditAction.UPDATE, before, after, me);
+            log.info("Запись #{} {}: {} -> {} (изменил {})", a.getId(), timeChanged ? "перенесена" : "изменена",
+                    before, after, me.username());
         }
         return AppointmentDto.from(a);
     }
@@ -193,8 +200,10 @@ public class AppointmentService {
         appointments.saveAndFlush(a);
         invoices.onClosedWithoutVisit(a);
         String why = trimToNull(reason);
-        log(a, AuditAction.CANCEL, AppointmentStatus.SCHEDULED.title(),
+        writeAudit(a, AuditAction.CANCEL, AppointmentStatus.SCHEDULED.title(),
                 AppointmentStatus.CANCELLED.title() + (why != null ? ". Причина: " + why : ""), me);
+        log.info("Запись #{} отменена, время освобождено: {} (отменил {}, причина: {})", a.getId(), describe(a),
+                me.username(), why != null ? why : "не указана");
         return AppointmentDto.from(a);
     }
 
@@ -220,7 +229,8 @@ public class AppointmentService {
         } else {
             invoices.onClosedWithoutVisit(a);
         }
-        log(a, AuditAction.STATUS, old.title(), status.title(), me);
+        writeAudit(a, AuditAction.STATUS, old.title(), status.title(), me);
+        log.info("Запись #{}: статус «{}» -> «{}» (отметил {})", a.getId(), old.title(), status.title(), me.username());
         return AppointmentDto.from(a);
     }
 
@@ -308,7 +318,7 @@ public class AppointmentService {
         }
     }
 
-    private void log(Appointment a, AuditAction action, String oldValue, String newValue, AuthUser me) {
+    private void writeAudit(Appointment a, AuditAction action, String oldValue, String newValue, AuthUser me) {
         AppointmentAudit entry = new AppointmentAudit();
         entry.setAppointment(a);
         entry.setAction(action);

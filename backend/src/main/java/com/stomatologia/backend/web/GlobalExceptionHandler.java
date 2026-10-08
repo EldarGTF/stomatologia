@@ -1,8 +1,10 @@
 package com.stomatologia.backend.web;
 
 import com.stomatologia.backend.common.ApiException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import jakarta.servlet.http.HttpServletRequest;
+import org.apache.logging.log4j.Level;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -20,10 +22,14 @@ import java.util.stream.Collectors;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+    private static final Logger log = LogManager.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(ApiException.class)
-    public ResponseEntity<ApiError> handleApi(ApiException ex) {
+    public ResponseEntity<ApiError> handleApi(ApiException ex, HttpServletRequest request) {
+        Level level = ex.getStatus() == HttpStatus.FORBIDDEN || ex.getStatus() == HttpStatus.UNAUTHORIZED
+                ? Level.WARN : Level.INFO;
+        log.log(level, "{} {} -> {}: {}", request.getMethod(), request.getRequestURI(),
+                ex.getStatus().value(), ex.getMessage());
         return error(ex.getStatus(), ex.getMessage());
     }
 
@@ -42,7 +48,8 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(AccessDeniedException.class)
-    public ResponseEntity<ApiError> handleAccessDenied(AccessDeniedException ex) {
+    public ResponseEntity<ApiError> handleAccessDenied(AccessDeniedException ex, HttpServletRequest request) {
+        log.warn("{} {} -> 403: доступ запрещён ролью", request.getMethod(), request.getRequestURI());
         return error(HttpStatus.FORBIDDEN, "Недостаточно прав для выполнения действия");
     }
 
@@ -51,6 +58,7 @@ public class GlobalExceptionHandler {
         String sqlState = findSqlState(ex);
         String details = String.valueOf(ex.getMostSpecificCause().getMessage());
         if ("23P01".equals(sqlState)) {
+            log.warn("Двойная запись отклонена ограничением БД: {}", details);
             String who = details.contains("no_room_overlap") ? "Кабинет" : "Врач";
             return error(HttpStatus.CONFLICT, who + " уже занят в выбранное время");
         }
