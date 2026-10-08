@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.DatePicker?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.VBox?>
+
+<VBox xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="com.stomatologia.client.controller.AppointmentsController"
+      styleClass="content">
+    <HBox styleClass="toolbar">
+        <VBox>
+            <Label fx:id="titleLabel" text="Приёмы" styleClass="page-title"/>
+            <Label fx:id="countLabel" styleClass="muted"/>
+        </VBox>
+        <Region HBox.hgrow="ALWAYS"/>
+        <Button fx:id="addButton" text="Добавить" styleClass="primary" onAction="#onAdd"/>
+        <Button fx:id="rescheduleButton" text="Изменить / перенести" onAction="#onReschedule"/>
+        <Button fx:id="cancelButton" text="Отменить" styleClass="danger" onAction="#onCancel"/>
+    </HBox>
+    <HBox styleClass="toolbar">
+        <Label text="Период" styleClass="field-label" minWidth="-Infinity"/>
+        <DatePicker fx:id="fromPicker" prefWidth="140" minWidth="140"/>
+        <Label text="—"/>
+        <DatePicker fx:id="toPicker" prefWidth="140" minWidth="140"/>
+        <Button text="Сегодня" onAction="#onToday" minWidth="-Infinity"/>
+        <Button text="Неделя" onAction="#onWeek" minWidth="-Infinity"/>
+        <Button text="Месяц" onAction="#onMonth" minWidth="-Infinity"/>
+        <Region HBox.hgrow="ALWAYS"/>
+        <Button text="Обновить" onAction="#onRefresh" minWidth="-Infinity"/>
+    </HBox>
+    <HBox styleClass="toolbar">
+        <ComboBox fx:id="doctorFilter" promptText="Все врачи" prefWidth="260"/>
+        <ComboBox fx:id="statusFilter" promptText="Все статусы" prefWidth="170"/>
+        <TextField fx:id="searchField" promptText="Поиск по пациенту или телефону" styleClass="search-field"/>
+    </HBox>
+    <TableView fx:id="table" VBox.vgrow="ALWAYS"/>
+    <HBox styleClass="toolbar">
+        <Button fx:id="completeButton" text="Приём завершён" onAction="#onComplete"/>
+        <Button fx:id="noShowButton" text="Неявка" onAction="#onNoShow"/>
+        <Button fx:id="historyButton" text="История изменений" onAction="#onHistory"/>
+        <Region HBox.hgrow="ALWAYS"/>
+        <Label fx:id="hintLabel" styleClass="muted"/>
+    </HBox>
+</VBox>

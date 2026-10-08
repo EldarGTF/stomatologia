@@ -398,6 +398,18 @@
 
 .slot-button {
     -fx-min-width: 72;
+    -fx-background-radius: 8;
+    -fx-border-radius: 8;
+    -fx-padding: 7 12 7 12;
+    -fx-background-color: #f0fdfa;
+    -fx-border-color: #99f6e4;
+    -fx-text-fill: -color-primary;
+    -fx-font-weight: bold;
+    -fx-cursor: hand;
+}
+
+.slot-button:hover {
+    -fx-background-color: -color-primary-soft;
 }
 
 .slot-button:selected, .slot-button.selected {

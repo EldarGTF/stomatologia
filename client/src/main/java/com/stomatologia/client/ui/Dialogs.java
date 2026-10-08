@@ -27,7 +27,11 @@ public final class Dialogs {
     }
 
     public static void info(String message) {
-        Alert alert = alert(Alert.AlertType.INFORMATION, "Готово", message);
+        info("Готово", message);
+    }
+
+    public static void info(String title, String message) {
+        Alert alert = alert(Alert.AlertType.INFORMATION, title, message);
         alert.showAndWait();
     }
 

@@ -8,6 +8,7 @@ import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableRow;
 import javafx.scene.control.TableView;
 
+import java.util.Comparator;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -43,6 +44,26 @@ public final class Tables {
                 setText(empty || item == null ? null : format.apply(item));
             }
         });
+        col.setPrefWidth(width);
+        table.getColumns().add(col);
+        return col;
+    }
+
+    /**
+     * Колонка, текст которой собирается из нескольких полей строки, с отдельным правилом сортировки.
+     */
+    public static <T> TableColumn<T, T> composite(TableView<T> table, String title, Function<T, String> format,
+                                                  Comparator<T> comparator, double width) {
+        TableColumn<T, T> col = new TableColumn<>(title);
+        col.setCellValueFactory(cd -> new ReadOnlyObjectWrapper<>(cd.getValue()));
+        col.setCellFactory(c -> new TableCell<>() {
+            @Override
+            protected void updateItem(T item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty || item == null ? null : format.apply(item));
+            }
+        });
+        col.setComparator(comparator);
         col.setPrefWidth(width);
         table.getColumns().add(col);
         return col;
