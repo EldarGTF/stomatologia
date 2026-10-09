@@ -49,6 +49,14 @@ public class ConversationService {
     static final String NOT_BOOKED = "[Служебное сообщение системы, клиент его не видит] Запись НЕ создана: "
             + "book_appointment не вызывался или вернул ошибку. Если клиент подтвердил время и согласие — вызови "
             + "find_free_slots и book_appointment сейчас. Иначе ответь клиенту заново, не утверждая, что он записан.";
+    private static final Pattern NO_SLOTS_CLAIM = Pattern.compile(
+            "(нет|не\\s+осталось|закончил|занят|закрыт)[^.!?]{0,40}(мест|врем|слот|окошк|окон)"
+                    + "|(мест|врем|слот|окошк|окон)[^.!?]{0,40}(нет|не\\s+осталось|закончил|занят|закрыт)"
+                    + "|запис[^.!?]{0,40}закрыт|закрыт[^.!?]{0,40}запис",
+            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CHARACTER_CLASS);
+    static final String NOT_SEARCHED = "[Служебное сообщение системы, клиент его не видит] Ты сказал, что "
+            + "свободного времени нет, но в этом ответе не вызвал find_free_slots — это догадка. Вызови find_free_slots "
+            + "(с датой, если клиент её назвал) и ответь по его результату.";
 
     private final ChatModel model;
     private final AssistantTools tools;
@@ -129,21 +137,25 @@ public class ConversationService {
             });
         }
         boolean booked = chat.appointmentStart() != null;
+        boolean searched = false;
         boolean corrected = false;
         for (int step = 0; step < MAX_TOOL_STEPS; step++) {
             ModelReply reply = model.reply(system, messages, tools.specs());
             if (!reply.wantsTools()) {
                 String text = clean(reply.text());
-                if (booked || !claimsBooking(text)) {
+                boolean falseBooking = !booked && claimsBooking(text);
+                boolean guessedSlots = !searched && claimsNoSlots(text);
+                if (!falseBooking && !guessedSlots) {
                     return text;
                 }
-                log.warn("Разговор #{}: модель сообщила о записи, не вызвав book_appointment: {}", conversationId, text);
+                log.warn("Разговор #{}: модель {} без инструмента: {}", conversationId,
+                        falseBooking ? "сообщила о записи" : "сказала, что времени нет,", text);
                 if (corrected) {
-                    return null;
+                    return falseBooking ? null : text;
                 }
                 corrected = true;
                 messages.add(AssistantTurn.text(text));
-                messages.add(new UserText(NOT_BOOKED));
+                messages.add(new UserText(falseBooking ? NOT_BOOKED : NOT_SEARCHED));
                 continue;
             }
             messages.add(new AssistantTurn(reply.text(), reply.toolCalls()));
@@ -152,6 +164,7 @@ public class ConversationService {
                 log.info("Разговор #{}: инструмент {} {}", conversationId, call.name(), call.input());
                 ToolResult result = tools.execute(call, conversationId);
                 booked |= call.name().equals("book_appointment") && !result.error();
+                searched |= call.name().equals("find_free_slots") && !result.error();
                 results.add(result);
             }
             messages.add(new ToolResults(results));
@@ -200,6 +213,10 @@ public class ConversationService {
 
     static boolean claimsBooking(String text) {
         return text != null && BOOKING_CLAIM.matcher(text).find();
+    }
+
+    static boolean claimsNoSlots(String text) {
+        return text != null && NO_SLOTS_CLAIM.matcher(text).find();
     }
 
     /** Модель иногда всё же присылает Markdown — в мессенджере он выглядит как мусор. */

@@ -204,6 +204,49 @@ class ConversationServiceTest {
     }
 
     @Test
+    void noSlotsClaimWithoutSearchIsSentBackToModel() throws Exception {
+        ToolCall search = new ToolCall("toolu_1", "find_free_slots", mapper.readTree("{\"service_id\":3}"));
+        List<List<ModelMessage>> seen = new ArrayList<>();
+        when(model.reply(anyString(), anyList(), anyList())).thenAnswer(inv -> {
+            seen.add(List.copyOf(inv.getArgument(1)));
+            return switch (seen.size()) {
+                case 1 -> new ModelReply("К сожалению, запись на сегодня уже закрыта.", List.of());
+                case 2 -> new ModelReply("", List.of(search));
+                default -> new ModelReply("Сегодня свободно 18:00 у Петрова.", List.of());
+            };
+        });
+        when(tools.execute(search, 7L)).thenReturn(new ToolResult("toolu_1", "[\"18:00\"]", false));
+
+        Reply reply = send("Запишите на сегодня");
+
+        assertThat(reply.texts()).containsExactly("Сегодня свободно 18:00 у Петрова.");
+        assertThat(seen.get(1).get(seen.get(1).size() - 1)).isEqualTo(new UserText(ConversationService.NOT_SEARCHED));
+    }
+
+    @Test
+    void noSlotsAfterRealSearchIsAccepted() throws Exception {
+        ToolCall search = new ToolCall("toolu_1", "find_free_slots", mapper.readTree("{\"service_id\":3}"));
+        when(model.reply(anyString(), anyList(), anyList()))
+                .thenReturn(new ModelReply("", List.of(search)))
+                .thenReturn(new ModelReply("На сегодня мест нет, ближайшее — завтра в 10:00.", List.of()));
+        when(tools.execute(search, 7L)).thenReturn(new ToolResult("toolu_1", "[]", false));
+
+        Reply reply = send("Запишите на сегодня");
+
+        assertThat(reply.texts()).containsExactly("На сегодня мест нет, ближайшее — завтра в 10:00.");
+        verify(model, times(2)).reply(anyString(), anyList(), anyList());
+    }
+
+    @Test
+    void noSlotsClaimsAreRecognized() {
+        assertThat(ConversationService.claimsNoSlots("Запись на этот же день вероятно уже закрыта.")).isTrue();
+        assertThat(ConversationService.claimsNoSlots("На сегодня свободных мест нет")).isTrue();
+        assertThat(ConversationService.claimsNoSlots("Всё время на завтра уже занято")).isTrue();
+        assertThat(ConversationService.claimsNoSlots("У вас пока нет записи. Подобрать время?")).isFalse();
+        assertThat(ConversationService.claimsNoSlots("Есть время завтра в 10:00 и 11:30")).isFalse();
+    }
+
+    @Test
     void operatorMessagesAreShownToModelAsAdministrator() {
         when(store.history(7L, 20)).thenReturn(List.of(message(MessageRole.USER, "Можно в субботу?"),
                 message(MessageRole.OPERATOR, "Да, до 14:00"), message(MessageRole.USER, "Спасибо")));
