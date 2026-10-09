@@ -1,11 +1,13 @@
 package com.stomatologia.backend.web;
 
+import com.stomatologia.backend.assistant.ConversationService;
 import com.stomatologia.backend.domain.LeadSource;
 import com.stomatologia.backend.domain.LeadStatus;
 import com.stomatologia.backend.dto.LeadDtos.ChatMessageDto;
 import com.stomatologia.backend.dto.LeadDtos.LeadBookRequest;
 import com.stomatologia.backend.dto.LeadDtos.LeadDto;
 import com.stomatologia.backend.dto.LeadDtos.LeadRequest;
+import com.stomatologia.backend.dto.LeadDtos.OperatorMessageRequest;
 import com.stomatologia.backend.dto.LeadDtos.RejectRequest;
 import com.stomatologia.backend.dto.PatientDtos.PatientDto;
 import com.stomatologia.backend.service.LeadService;
@@ -36,9 +38,11 @@ import java.util.List;
 public class LeadController {
 
     private final LeadService leadService;
+    private final ConversationService conversations;
 
-    public LeadController(LeadService leadService) {
+    public LeadController(LeadService leadService, ConversationService conversations) {
         this.leadService = leadService;
+        this.conversations = conversations;
     }
 
     @GetMapping
@@ -101,5 +105,18 @@ public class LeadController {
     @GetMapping("/{id}/messages")
     public List<ChatMessageDto> messages(@PathVariable Long id) {
         return leadService.messages(id);
+    }
+
+    /** Ответ клиенту от имени администратора: дальше разговор ведёт человек. */
+    @PostMapping("/{id}/messages")
+    public List<ChatMessageDto> reply(@PathVariable Long id, @Valid @RequestBody OperatorMessageRequest request) {
+        conversations.operatorReply(id, request.text());
+        return leadService.messages(id);
+    }
+
+    @PostMapping("/{id}/conversation/assistant")
+    public LeadDto returnToAssistant(@PathVariable Long id) {
+        conversations.returnToAssistant(id);
+        return leadService.get(id);
     }
 }

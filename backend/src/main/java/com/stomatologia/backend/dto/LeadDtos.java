@@ -1,6 +1,9 @@
 package com.stomatologia.backend.dto;
 
+import com.stomatologia.backend.domain.ChatChannel;
 import com.stomatologia.backend.domain.ChatMessage;
+import com.stomatologia.backend.domain.Conversation;
+import com.stomatologia.backend.domain.ConversationMode;
 import com.stomatologia.backend.domain.Lead;
 import com.stomatologia.backend.domain.LeadSource;
 import com.stomatologia.backend.domain.LeadStatus;
@@ -22,9 +25,11 @@ public final class LeadDtos {
                           LocalDateTime preferredStart, String preferredText, String summary, LocalDateTime consentAt,
                           Long patientId, String patientName, Long appointmentId, LocalDateTime appointmentStart,
                           String assignedTo, String rejectReason, LocalDateTime createdAt, LocalDateTime updatedAt,
-                          boolean hasConversation, LocalDateTime confirmedAt, boolean awaitsConfirmation) {
+                          boolean hasConversation, LocalDateTime confirmedAt, boolean awaitsConfirmation,
+                          ChatChannel conversationChannel, ConversationMode conversationMode) {
 
-        public static LeadDto from(Lead l, boolean hasConversation) {
+        /** c — последний разговор по заявке или null. */
+        public static LeadDto from(Lead l, Conversation c) {
             return new LeadDto(l.getId(), l.getSource(), l.getStatus(), l.getName(), l.getPhone(),
                     l.getService() != null ? l.getService().getId() : null,
                     l.getService() != null ? l.getService().getName() : null,
@@ -36,9 +41,16 @@ public final class LeadDtos {
                     l.getAppointment() != null ? l.getAppointment().getId() : null,
                     l.getAppointment() != null ? l.getAppointment().getStartAt() : null,
                     l.getAssignedTo() != null ? l.getAssignedTo().getFullName() : null,
-                    l.getRejectReason(), l.getCreatedAt(), l.getUpdatedAt(), hasConversation,
-                    l.getConfirmedAt(), l.awaitsConfirmation());
+                    l.getRejectReason(), l.getCreatedAt(), l.getUpdatedAt(), c != null,
+                    l.getConfirmedAt(), l.awaitsConfirmation(),
+                    c != null ? c.getChannel() : null, c != null ? c.getMode() : null);
         }
+    }
+
+    /** Ответ оператора клиенту из карточки заявки. */
+    public record OperatorMessageRequest(
+            @NotBlank(message = "Введите текст сообщения") @Size(max = 2000, message = "Сообщение слишком длинное")
+            String text) {
     }
 
     public record LeadRequest(

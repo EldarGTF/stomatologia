@@ -18,12 +18,12 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long>,
     @Query("""
             select count(a) from Appointment a
             where a.patient.id in :patientIds
-              and a.source = :source
+              and a.source in :sources
               and a.status = com.stomatologia.backend.domain.AppointmentStatus.SCHEDULED
               and a.startAt > :now
             """)
-    long countUpcoming(@Param("patientIds") Collection<Long> patientIds, @Param("source") AppointmentSource source,
-                       @Param("now") LocalDateTime now);
+    long countUpcoming(@Param("patientIds") Collection<Long> patientIds,
+                       @Param("sources") Collection<AppointmentSource> sources, @Param("now") LocalDateTime now);
 
     /**
      * Активные (не отменённые) приёмы врача, пересекающиеся с интервалом [start, end).

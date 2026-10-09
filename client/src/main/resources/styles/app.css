@@ -592,3 +592,8 @@
     -fx-background-color: -color-primary-soft;
     -fx-text-fill: #134e4a;
 }
+
+.chat-operator {
+    -fx-background-color: #ffedd5;
+    -fx-text-fill: #7c2d12;
+}

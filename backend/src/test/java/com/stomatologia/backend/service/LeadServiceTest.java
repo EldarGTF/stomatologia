@@ -43,7 +43,6 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -94,7 +93,7 @@ class LeadServiceTest {
         registrar = new User();
         registrar.setFullName("Козлова Марина Сергеевна");
         when(users.getReferenceById(2L)).thenReturn(registrar);
-        when(conversations.findLeadIdsWithConversation(anyCollection())).thenReturn(Set.of());
+        when(conversations.findByLeadIds(anyCollection())).thenReturn(List.of());
 
         lead = new Lead();
         lead.setId(10L);

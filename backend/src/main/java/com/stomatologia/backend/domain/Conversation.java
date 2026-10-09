@@ -45,6 +45,14 @@ public class Conversation {
     @Column(nullable = false, length = 20)
     private ConversationMode mode = ConversationMode.AI;
 
+    /** Имя из профиля мессенджера — пока клиент не представился сам. */
+    @Column(length = 100)
+    private String clientName;
+
+    /** Номер, подтверждённый мессенджером (кнопка «Поделиться контактом» в Telegram). */
+    @Column(length = 30)
+    private String clientPhone;
+
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 

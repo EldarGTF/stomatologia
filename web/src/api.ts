@@ -75,6 +75,22 @@ export interface BookingInfo {
   confirmed: boolean;
 }
 
+export type ChatRole = 'USER' | 'ASSISTANT' | 'OPERATOR';
+
+export interface ChatMessage {
+  id: number;
+  role: ChatRole;
+  text: string;
+  sentAt: string;
+}
+
+/** operator — разговор ведёт администратор клиники, ответ придёт не сразу. */
+export interface ChatState {
+  sessionId: string;
+  messages: ChatMessage[];
+  operator: boolean;
+}
+
 export class ApiError extends Error {
   constructor(public status: number, message: string) {
     super(message);
@@ -129,4 +145,8 @@ export const api = {
   cancel: (token: string) =>
     request<BookingInfo>(`/bookings/${encodeURIComponent(token)}/cancel`, { method: 'POST' }),
   ticketUrl: (token: string) => `${BASE}/bookings/${encodeURIComponent(token)}/ticket`,
+  chatSend: (sessionId: string | null, text: string, website: string) =>
+    request<ChatState>('/chat/messages', { method: 'POST', body: JSON.stringify({ sessionId, text, website }) }),
+  chatPoll: (sessionId: string, after: number) =>
+    request<ChatState>(`/chat/${encodeURIComponent(sessionId)}` + query({ after })),
 };

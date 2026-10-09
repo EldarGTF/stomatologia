@@ -4,6 +4,9 @@ server:
 spring:
   application:
     name: stomatologia
+  # Локальные секреты (ключ Claude, токен Telegram, пароль БД) — в .env рядом с проектом, он не попадает в git
+  config:
+    import: "optional:file:.env[.properties],optional:file:../.env[.properties]"
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/stomatologia}
     username: ${DB_USER:postgres}
@@ -27,10 +30,25 @@ app:
     secret: ${JWT_SECRET:dev-only-secret-key-change-me-0123456789abcdef}
     expiration-hours: 8
   demo-data: ${DEMO_DATA:true}
+  # Адрес сайта для ссылок, которые ИИ-менеджер отправляет клиентам
+  site-url: ${SITE_URL:http://localhost:8080}
   # Лимиты публичного API сайта онлайн-записи с одного IP-адреса
   public-api:
     reads-per-minute: 120
     writes-per-hour: 10
+    chat-messages-per-hour: 60
+  # ИИ-менеджер: без ключа разговоры сразу передаются администратору
+  assistant:
+    api-key: ${ANTHROPIC_API_KEY:}
+    model: ${ANTHROPIC_MODEL:claude-haiku-4-5}
+    base-url: https://api.anthropic.com
+    max-tokens: 1024
+    timeout-seconds: 40
+    history-messages: 20
+    daily-messages-per-chat: 60
+  # Telegram-бот включается, когда задан токен от @BotFather
+  telegram:
+    bot-token: ${TELEGRAM_BOT_TOKEN:}
 
 management:
   endpoints:

@@ -2,6 +2,7 @@ package com.stomatologia.backend.service;
 
 import com.stomatologia.backend.common.ApiException;
 import com.stomatologia.backend.common.Phones;
+import com.stomatologia.backend.domain.Conversation;
 import com.stomatologia.backend.domain.Lead;
 import com.stomatologia.backend.domain.LeadSource;
 import com.stomatologia.backend.domain.LeadStatus;
@@ -36,8 +37,9 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
 
 /**
  * Заявки: список, взятие в работу, отказ и запись на приём. Запись создаётся через {@link AppointmentService},
@@ -112,9 +114,14 @@ public class LeadService {
             return cb.and(p.toArray(Predicate[]::new));
         };
         List<Lead> list = leads.findAll(spec, Sort.by(Sort.Direction.DESC, "createdAt"));
-        Set<Long> withChat = list.isEmpty() ? Set.of()
-                : conversations.findLeadIdsWithConversation(list.stream().map(Lead::getId).toList());
-        return list.stream().map(l -> LeadDto.from(l, withChat.contains(l.getId()))).toList();
+        Map<Long, Conversation> chats = new HashMap<>();
+        if (!list.isEmpty()) {
+            for (Conversation c : conversations.findByLeadIds(list.stream().map(Lead::getId).toList())) {
+                chats.merge(c.getLead().getId(), c,
+                        (a, b) -> a.getLastMessageAt().isAfter(b.getLastMessageAt()) ? a : b);
+            }
+        }
+        return list.stream().map(l -> LeadDto.from(l, chats.get(l.getId()))).toList();
     }
 
     @Transactional(readOnly = true)
@@ -293,9 +300,9 @@ public class LeadService {
         l.setSummary(trimToNull(r.summary()));
     }
 
-    private LeadDto dto(Lead l) {
-        boolean hasChat = l.getId() != null && !conversations.findLeadIdsWithConversation(List.of(l.getId())).isEmpty();
-        return LeadDto.from(l, hasChat);
+    LeadDto dto(Lead l) {
+        return LeadDto.from(l, l.getId() == null ? null
+                : conversations.findFirstByLeadIdOrderByLastMessageAtDesc(l.getId()).orElse(null));
     }
 
     Lead find(Long id) {

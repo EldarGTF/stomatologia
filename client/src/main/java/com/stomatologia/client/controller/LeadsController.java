@@ -3,11 +3,14 @@ package com.stomatologia.client.controller;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.stomatologia.client.api.ApiClient;
 import com.stomatologia.client.dialog.LeadDialogs;
+import com.stomatologia.client.model.LeadModels.ChatChannel;
 import com.stomatologia.client.model.LeadModels.ChatMessageDto;
+import com.stomatologia.client.model.LeadModels.ConversationMode;
 import com.stomatologia.client.model.LeadModels.LeadDto;
 import com.stomatologia.client.model.LeadModels.LeadSource;
 import com.stomatologia.client.model.LeadModels.LeadStatus;
 import com.stomatologia.client.model.LeadModels.MessageRole;
+import com.stomatologia.client.model.LeadModels.OperatorMessageRequest;
 import com.stomatologia.client.ui.Dialogs;
 import com.stomatologia.client.ui.Downloads;
 import com.stomatologia.client.ui.Formats;
@@ -28,7 +31,9 @@ import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.TableView;
+import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
+import javafx.scene.input.KeyCode;
 import javafx.scene.layout.ColumnConstraints;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.GridPane;
@@ -42,7 +47,9 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -78,6 +85,14 @@ public class LeadsController {
     private final Timeline autoRefresh = new Timeline(new KeyFrame(Duration.seconds(30),
             e -> load(false, selectedId())));
     private int detailRequest;
+    private final Timeline chatRefresh = new Timeline(new KeyFrame(Duration.seconds(8),
+            e -> refreshChat(detailRequest)));
+    private final Map<Long, String> drafts = new HashMap<>();
+    private boolean reloading;
+    private LeadDto shown;
+    private VBox chatBox;
+    private Long chatLeadId;
+    private int chatSize;
 
     @FXML
     private void initialize() {
@@ -129,16 +144,23 @@ public class LeadsController {
         table.setItems(sorted);
         Tables.onDoubleClick(table, this::book);
 
-        table.getSelectionModel().selectedItemProperty().addListener((obs, o, n) -> showDetail(n));
+        table.getSelectionModel().selectedItemProperty().addListener((obs, o, n) -> {
+            if (!reloading && !Objects.equals(n, shown)) {
+                showDetail(n);
+            }
+        });
         statusFilter.valueProperty().addListener((obs, o, n) -> load(true, selectedId()));
         sourceFilter.valueProperty().addListener((obs, o, n) -> load(true, selectedId()));
         searchField.textProperty().addListener((obs, o, n) -> applySearch());
 
         autoRefresh.setCycleCount(Timeline.INDEFINITE);
         autoRefresh.play();
+        chatRefresh.setCycleCount(Timeline.INDEFINITE);
+        chatRefresh.play();
         table.sceneProperty().addListener((obs, o, n) -> {
             if (n == null) {
                 autoRefresh.stop();
+                chatRefresh.stop();
             }
         });
         showDetail(null);
@@ -153,10 +175,15 @@ public class LeadsController {
                 "source", source == null ? null : source.name());
         Fx.async(() -> ApiClient.get().get(path, new TypeReference<List<LeadDto>>() {
         }), list -> {
-            leads.setAll(list);
-            applySearch();
+            reloading = true;
+            try {
+                leads.setAll(list);
+                applySearch();
+                select(selectId);
+            } finally {
+                reloading = false;
+            }
             updatedLabel.setText("обновлено в " + Formats.TIME.format(LocalTime.now()));
-            select(selectId);
         }, ex -> {
             if (manual) {
                 Dialogs.error(ex);
@@ -181,13 +208,19 @@ public class LeadsController {
         return selected == null ? null : selected.id();
     }
 
+    /** Карточка перестраивается, только если заявка изменилась: иначе сбросился бы набираемый ответ. */
     private void select(Long id) {
         if (id == null) {
+            if (shown != null) {
+                showDetail(null);
+            }
             return;
         }
         table.getItems().stream().filter(l -> l.id().equals(id)).findFirst().ifPresentOrElse(l -> {
             table.getSelectionModel().select(l);
-            showDetail(l);
+            if (!l.equals(shown)) {
+                showDetail(l);
+            }
         }, () -> showDetail(null));
     }
 
@@ -200,6 +233,9 @@ public class LeadsController {
     private void showDetail(LeadDto l) {
         detailBox.getChildren().clear();
         int request = ++detailRequest;
+        shown = l;
+        chatBox = null;
+        chatLeadId = null;
         if (l == null) {
             Label hint = new Label("Выберите заявку в списке, чтобы увидеть подробности и переписку");
             hint.getStyleClass().add("muted");
@@ -256,20 +292,118 @@ public class LeadsController {
         if (l.hasConversation()) {
             Label caption = new Label("Переписка");
             caption.getStyleClass().add("section-title");
+            HBox header = new HBox(8, caption);
+            header.setAlignment(Pos.CENTER_LEFT);
+            if (l.conversationChannel() != null) {
+                header.getChildren().add(badge(l.conversationChannel().title(), "badge-muted"));
+            }
+            if (l.conversationMode() != null) {
+                header.getChildren().add(badge(l.conversationMode().title(), l.conversationMode().styleClass()));
+            }
             VBox chat = new VBox(8);
             chat.getStyleClass().add("chat");
             Label loading = new Label("Загрузка…");
             loading.getStyleClass().add("muted");
             chat.getChildren().add(loading);
-            detailBox.getChildren().addAll(caption, chat);
-            Fx.async(() -> ApiClient.get().get("/api/leads/" + l.id() + "/messages",
-                    new TypeReference<List<ChatMessageDto>>() {
-                    }), list -> {
-                if (request == detailRequest) {
-                    chat.getChildren().setAll(list.stream().map(LeadsController::bubble).toList());
-                }
-            });
+            detailBox.getChildren().addAll(header, chat);
+            chatBox = chat;
+            chatLeadId = l.id();
+            chatSize = -1;
+            refreshChat(request);
+            if (l.conversationMode() != ConversationMode.CLOSED) {
+                detailBox.getChildren().add(replyBox(l));
+            }
         }
+    }
+
+    /** Переписка выбранной заявки: при открытии карточки и раз в несколько секунд, пока она открыта. */
+    private void refreshChat(int request) {
+        Long leadId = chatLeadId;
+        if (chatBox == null || leadId == null) {
+            return;
+        }
+        Fx.async(() -> ApiClient.get().get("/api/leads/" + leadId + "/messages",
+                new TypeReference<List<ChatMessageDto>>() {
+                }), list -> showMessages(request, list), ex -> {
+        });
+    }
+
+    private void showMessages(int request, List<ChatMessageDto> list) {
+        if (request != detailRequest || chatBox == null || list.size() == chatSize) {
+            return;
+        }
+        chatSize = list.size();
+        chatBox.getChildren().setAll(list.stream().map(LeadsController::bubble).toList());
+    }
+
+    /** Ответ клиенту от имени клиники. Черновик переживает автообновление списка. */
+    private Node replyBox(LeadDto l) {
+        TextArea text = new TextArea(drafts.getOrDefault(l.id(), ""));
+        text.setPromptText("Ответ клиенту…");
+        text.setWrapText(true);
+        text.setPrefRowCount(3);
+        text.textProperty().addListener((obs, o, n) -> {
+            if (n == null || n.isBlank()) {
+                drafts.remove(l.id());
+            } else {
+                drafts.put(l.id(), n);
+            }
+        });
+
+        Button send = new Button("Отправить");
+        send.getStyleClass().add("primary");
+        send.disableProperty().bind(text.textProperty().isEmpty());
+        Runnable doSend = () -> {
+            String message = text.getText() == null ? "" : text.getText().trim();
+            if (message.isEmpty()) {
+                return;
+            }
+            send.disableProperty().unbind();
+            send.setDisable(true);
+            int request = detailRequest;
+            Fx.async(() -> ApiClient.get().post("/api/leads/" + l.id() + "/messages",
+                    new OperatorMessageRequest(message), new TypeReference<List<ChatMessageDto>>() {
+                    }), list -> {
+                drafts.remove(l.id());
+                text.clear();
+                showMessages(request, list);
+                load(false, l.id());
+            }, ex -> {
+                send.disableProperty().bind(text.textProperty().isEmpty());
+                Dialogs.error(ex);
+                refreshChat(request);
+            });
+        };
+        send.setOnAction(e -> doSend.run());
+        text.setOnKeyPressed(e -> {
+            if (e.getCode() == KeyCode.ENTER && e.isControlDown()) {
+                e.consume();
+                doSend.run();
+            }
+        });
+
+        HBox buttons = new HBox(8, send);
+        buttons.setAlignment(Pos.CENTER_LEFT);
+        if (l.conversationMode() == ConversationMode.OPERATOR) {
+            buttons.getChildren().add(button("Вернуть ИИ-менеджеру", () -> Fx.async(() -> ApiClient.get()
+                    .post("/api/leads/" + l.id() + "/conversation/assistant", null, LeadDto.class),
+                    this::reloadSelecting)));
+        }
+        Label hint = new Label(replyHint(l));
+        hint.getStyleClass().add("muted");
+        hint.setWrapText(true);
+        return new VBox(6, text, buttons, hint);
+    }
+
+    static String replyHint(LeadDto l) {
+        String where = l.conversationChannel() == ChatChannel.WEB_CHAT
+                ? "Клиент увидит ответ в чате на сайте."
+                : "Сообщение уйдёт клиенту в " + (l.conversationChannel() == null ? "мессенджер"
+                : l.conversationChannel().title()) + ".";
+        String mode = l.conversationMode() == ConversationMode.AI
+                ? " После ответа разговор перейдёт к вам — ИИ-менеджер перестанет отвечать."
+                : " Ctrl+Enter — отправить.";
+        return where + mode;
     }
 
     private Node actions(LeadDto l) {
@@ -358,7 +492,8 @@ public class LeadsController {
         Label text = new Label(m.text());
         text.setWrapText(true);
         text.setMaxWidth(340);
-        text.getStyleClass().addAll("chat-bubble", client ? "chat-client" : "chat-clinic");
+        text.getStyleClass().addAll("chat-bubble", client ? "chat-client"
+                : m.role() == MessageRole.OPERATOR ? "chat-operator" : "chat-clinic");
         VBox box = new VBox(2, meta, text);
         box.setAlignment(client ? Pos.CENTER_LEFT : Pos.CENTER_RIGHT);
         box.setFillWidth(false);

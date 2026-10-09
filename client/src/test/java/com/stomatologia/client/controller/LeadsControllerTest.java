@@ -1,5 +1,7 @@
 package com.stomatologia.client.controller;
 
+import com.stomatologia.client.model.LeadModels.ChatChannel;
+import com.stomatologia.client.model.LeadModels.ConversationMode;
 import com.stomatologia.client.model.LeadModels.LeadDto;
 import com.stomatologia.client.model.LeadModels.LeadSource;
 import com.stomatologia.client.model.LeadModels.LeadStatus;
@@ -15,14 +17,20 @@ class LeadsControllerTest {
     private static LeadDto lead(LocalDateTime preferredStart, String preferredText) {
         return new LeadDto(1L, LeadSource.TELEGRAM, LeadStatus.NEW, "Айгерим", null, null, null, null, null,
                 preferredStart, preferredText, null, null, null, null, null, null, null, null,
-                LocalDateTime.now(), LocalDateTime.now(), false, null, false);
+                LocalDateTime.now(), LocalDateTime.now(), false, null, false, null, null);
+    }
+
+    private static LeadDto chat(ChatChannel channel, ConversationMode mode) {
+        return new LeadDto(3L, LeadSource.TELEGRAM, LeadStatus.NEEDS_OPERATOR, "Айгерим", null, null, null, null,
+                null, null, null, null, null, null, null, null, null, null, null,
+                LocalDateTime.now(), LocalDateTime.now(), true, null, false, channel, mode);
     }
 
     private static LeadDto booked(boolean awaitsConfirmation) {
         return new LeadDto(2L, LeadSource.WEBSITE, LeadStatus.BOOKED, "Сайт Тестов", "+77019998877", null, null,
                 null, null, null, null, null, null, null, null, null, null, null, null,
                 LocalDateTime.now(), LocalDateTime.now(), false,
-                awaitsConfirmation ? null : LocalDateTime.now(), awaitsConfirmation);
+                awaitsConfirmation ? null : LocalDateTime.now(), awaitsConfirmation, null, null);
     }
 
     @Test
@@ -58,5 +66,15 @@ class LeadsControllerTest {
         LeadDto confirmed = booked(false);
         assertThat(confirmed.needsAttention()).isFalse();
         assertThat(confirmed.statusTitle()).isEqualTo("Записан");
+    }
+
+    @Test
+    void replyHintWarnsThatOperatorTakesOverFromAssistant() {
+        assertThat(LeadsController.replyHint(chat(ChatChannel.TELEGRAM, ConversationMode.AI)))
+                .startsWith("Сообщение уйдёт клиенту в Telegram.")
+                .contains("ИИ-менеджер перестанет отвечать");
+        assertThat(LeadsController.replyHint(chat(ChatChannel.WEB_CHAT, ConversationMode.OPERATOR)))
+                .startsWith("Клиент увидит ответ в чате на сайте.")
+                .doesNotContain("ИИ-менеджер");
     }
 }

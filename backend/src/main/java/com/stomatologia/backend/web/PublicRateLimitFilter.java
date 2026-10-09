@@ -28,15 +28,20 @@ public class PublicRateLimitFilter extends OncePerRequestFilter {
     private static final Logger log = LogManager.getLogger(PublicRateLimitFilter.class);
     private static final String PREFIX = "/api/public/";
 
+    private static final String CHAT = PREFIX + "chat/";
+
     private final RateLimiter reads;
     private final RateLimiter writes;
+    private final RateLimiter chat;
     private final ObjectMapper mapper;
 
     public PublicRateLimitFilter(@Value("${app.public-api.reads-per-minute:120}") int readsPerMinute,
                                  @Value("${app.public-api.writes-per-hour:10}") int writesPerHour,
+                                 @Value("${app.public-api.chat-messages-per-hour:60}") int chatMessagesPerHour,
                                  ObjectMapper mapper) {
         this.reads = new RateLimiter(readsPerMinute, Duration.ofMinutes(1));
         this.writes = new RateLimiter(writesPerHour, Duration.ofHours(1));
+        this.chat = new RateLimiter(chatMessagesPerHour, Duration.ofHours(1));
         this.mapper = mapper;
     }
 
@@ -50,19 +55,22 @@ public class PublicRateLimitFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
         String ip = request.getRemoteAddr();
         boolean write = "POST".equalsIgnoreCase(request.getMethod());
-        RateLimiter limiter = write ? writes : reads;
+        boolean chatMessage = write && request.getRequestURI().startsWith(CHAT);
+        RateLimiter limiter = chatMessage ? chat : write ? writes : reads;
         if (limiter.tryAcquire(ip)) {
             chain.doFilter(request, response);
             return;
         }
-        log.warn("Публичный API: превышен лимит {} с адреса {} ({} {})", write ? "записей" : "запросов", ip,
+        log.warn("Публичный API: превышен лимит {} с адреса {} ({} {})",
+                chatMessage ? "сообщений чата" : write ? "записей" : "запросов", ip,
                 request.getMethod(), request.getRequestURI());
         response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
         response.setHeader(HttpHeaders.RETRY_AFTER, String.valueOf(limiter.retryAfterSeconds(ip)));
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
-        mapper.writeValue(response.getOutputStream(), new ApiError(HttpStatus.TOO_MANY_REQUESTS.value(), write
-                ? "Слишком много попыток записи. Попробуйте позже или позвоните в клинику"
-                : "Слишком много запросов. Подождите минуту и обновите страницу"));
+        mapper.writeValue(response.getOutputStream(), new ApiError(HttpStatus.TOO_MANY_REQUESTS.value(),
+                chatMessage ? "Слишком много сообщений. Попробуйте позже или позвоните в клинику"
+                        : write ? "Слишком много попыток записи. Попробуйте позже или позвоните в клинику"
+                        : "Слишком много запросов. Подождите минуту и обновите страницу"));
     }
 }

@@ -27,7 +27,10 @@ import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Base64;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 
 /**
  * Онлайн-запись с сайта. Запись создаётся сразу (клиент выбирает реально свободное время), а в «Заявках»
@@ -41,6 +44,7 @@ public class PublicBookingService {
     private static final DateTimeFormatter DATE_TIME = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm");
     private static final SecureRandom RANDOM = new SecureRandom();
     static final int MAX_ACTIVE_ONLINE_BOOKINGS = 2;
+    static final Set<AppointmentSource> ONLINE_SOURCES = EnumSet.of(AppointmentSource.WEBSITE, AppointmentSource.MESSENGER);
     static final String CANCEL_REASON = "Клиент отменил запись на сайте";
 
     private final AppointmentService appointmentService;
@@ -63,8 +67,21 @@ public class PublicBookingService {
         this.word = word;
     }
 
+    /** Запись и заявка, по которой её видит регистратор. */
+    public record OnlineBooking(Lead lead, BookingInfo info) {
+    }
+
     @Transactional
     public BookingInfo book(BookingRequest r) {
+        return book(r, LeadSource.WEBSITE, null).info();
+    }
+
+    /**
+     * Онлайн-запись из любого канала: сайт, чат на сайте, мессенджер. reuseLeadId — заявка разговора:
+     * если она ещё открыта, её дополняет запись вместо того, чтобы заводить вторую.
+     */
+    @Transactional
+    public OnlineBooking book(BookingRequest r, LeadSource source, Long reuseLeadId) {
         if (r.website() != null && !r.website().isBlank()) {
             log.warn("Онлайн-запись отклонена: заполнено скрытое поле, похоже на бота");
             throw ApiException.badRequest("Не удалось отправить форму. Обновите страницу и попробуйте ещё раз");
@@ -82,7 +99,7 @@ public class PublicBookingService {
         List<Patient> samePhone = patients.findByPhoneDigits(Phones.lastTenDigits(phone));
         ClinicSettings settings = clinic.current();
         if (!samePhone.isEmpty() && appointments.countUpcoming(samePhone.stream().map(Patient::getId).toList(),
-                AppointmentSource.WEBSITE, LocalDateTime.now()) >= MAX_ACTIVE_ONLINE_BOOKINGS) {
+                ONLINE_SOURCES, LocalDateTime.now()) >= MAX_ACTIVE_ONLINE_BOOKINGS) {
             throw ApiException.conflict("На этот номер уже есть " + MAX_ACTIVE_ONLINE_BOOKINGS
                     + " предстоящие онлайн-записи. Чтобы записаться ещё, позвоните в клинику: " + settings.getPhone());
         }
@@ -93,26 +110,36 @@ public class PublicBookingService {
                 .orElseGet(() -> newPatient(lastName, firstName, phone));
         String comment = r.comment() == null || r.comment().isBlank() ? null : r.comment().trim();
         Appointment a = appointmentService.createOnline(patient,
-                new AppointmentRequest(patient.getId(), doctorId, r.serviceId(), r.startAt(), comment));
+                new AppointmentRequest(patient.getId(), doctorId, r.serviceId(), r.startAt(), comment),
+                source.appointmentSource());
 
-        Lead l = new Lead();
-        l.setSource(LeadSource.WEBSITE);
+        Lead l = (reuseLeadId == null ? Optional.<Lead>empty() : leads.findById(reuseLeadId))
+                .filter(x -> x.getStatus().isOpen())
+                .orElseGet(() -> {
+                    Lead fresh = new Lead();
+                    fresh.setSource(source);
+                    return fresh;
+                });
         l.setStatus(LeadStatus.BOOKED);
         l.setName(firstName + " " + lastName);
         l.setPhone(phone);
         l.setService(a.getService());
         l.setDoctor(a.getDoctor());
         l.setPreferredStart(a.getStartAt());
-        l.setSummary(comment);
+        if (comment != null) {
+            String summary = l.getSummary() == null ? comment : l.getSummary() + "\n" + comment;
+            l.setSummary(summary.length() > 2000 ? summary.substring(0, 2000) : summary);
+        }
         l.setConsentAt(LocalDateTime.now());
         l.setPatient(patient);
         l.setAppointment(a);
+        l.setConfirmedAt(null);
         l.setPublicToken(newToken());
         leads.saveAndFlush(l);
-        log.info("Онлайн-запись: заявка #{}, приём #{} — {} ({}), {} у врача {}", l.getId(), a.getId(),
-                patient.getFullName(), known ? "пациент найден по телефону" : "новый пациент",
+        log.info("Онлайн-запись ({}): заявка #{}, приём #{} — {} ({}), {} у врача {}", source.title(), l.getId(),
+                a.getId(), patient.getFullName(), known ? "пациент найден по телефону" : "новый пациент",
                 DATE_TIME.format(a.getStartAt()), a.getDoctor().getFullName());
-        return info(l);
+        return new OnlineBooking(l, info(l));
     }
 
     @Transactional(readOnly = true)

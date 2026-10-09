@@ -74,12 +74,62 @@ public final class LeadModels {
         OPERATOR
     }
 
+    public enum ChatChannel {
+        TELEGRAM("Telegram"),
+        WHATSAPP("WhatsApp"),
+        WEB_CHAT("Чат на сайте");
+
+        private final String title;
+
+        ChatChannel(String title) {
+            this.title = title;
+        }
+
+        public String title() {
+            return title;
+        }
+
+        @Override
+        public String toString() {
+            return title;
+        }
+    }
+
+    /** Кто сейчас отвечает клиенту в переписке. */
+    public enum ConversationMode {
+        AI("Отвечает ИИ-менеджер", "badge-info"),
+        OPERATOR("Отвечает оператор", "badge-warning"),
+        CLOSED("Разговор закрыт", "badge-muted");
+
+        private final String title;
+        private final String styleClass;
+
+        ConversationMode(String title, String styleClass) {
+            this.title = title;
+            this.styleClass = styleClass;
+        }
+
+        public String title() {
+            return title;
+        }
+
+        public String styleClass() {
+            return styleClass;
+        }
+
+        @Override
+        public String toString() {
+            return title;
+        }
+    }
+
     public record LeadDto(Long id, LeadSource source, LeadStatus status, String name, String phone,
                           Long serviceId, String serviceName, Long doctorId, String doctorName,
                           LocalDateTime preferredStart, String preferredText, String summary, LocalDateTime consentAt,
                           Long patientId, String patientName, Long appointmentId, LocalDateTime appointmentStart,
                           String assignedTo, String rejectReason, LocalDateTime createdAt, LocalDateTime updatedAt,
-                          boolean hasConversation, LocalDateTime confirmedAt, boolean awaitsConfirmation) {
+                          boolean hasConversation, LocalDateTime confirmedAt, boolean awaitsConfirmation,
+                          ChatChannel conversationChannel, ConversationMode conversationMode) {
 
         /** Онлайн-запись с сайта, которую администратор ещё не подтвердил звонком, тоже ждёт обработки. */
         public boolean needsAttention() {
@@ -104,6 +154,9 @@ public final class LeadModels {
     }
 
     public record RejectRequest(String reason) {
+    }
+
+    public record OperatorMessageRequest(String text) {
     }
 
     public record ChatMessageDto(Long id, MessageRole role, String text, String author, LocalDateTime sentAt) {

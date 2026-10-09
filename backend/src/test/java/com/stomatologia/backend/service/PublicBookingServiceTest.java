@@ -104,7 +104,7 @@ class PublicBookingServiceTest {
             p.setId(500L);
             return p;
         });
-        when(appointmentService.createOnline(any(), any()))
+        when(appointmentService.createOnline(any(), any(), any()))
                 .thenAnswer(inv -> appointment(inv.getArgument(0), inv.getArgument(1)));
         when(leads.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
     }
@@ -184,7 +184,7 @@ class PublicBookingServiceTest {
         service.book(request());
 
         verify(patients, never()).saveAndFlush(any());
-        verify(appointmentService).createOnline(eq(known), any());
+        verify(appointmentService).createOnline(eq(known), any(), eq(AppointmentSource.WEBSITE));
     }
 
     @Test
@@ -200,14 +200,14 @@ class PublicBookingServiceTest {
     void filledHoneypotLooksLikeBot() {
         assertThatThrownBy(() -> service.book(request(2L, "+77015551234", true, "http://spam")))
                 .satisfies(ex -> assertThat(statusOf(ex)).isEqualTo(HttpStatus.BAD_REQUEST));
-        verify(appointmentService, never()).createOnline(any(), any());
+        verify(appointmentService, never()).createOnline(any(), any(), any());
     }
 
     @Test
     void consentIsRequired() {
         assertThatThrownBy(() -> service.book(request(2L, "+77015551234", false, null)))
                 .hasMessageContaining("согласие");
-        verify(appointmentService, never()).createOnline(any(), any());
+        verify(appointmentService, never()).createOnline(any(), any(), any());
     }
 
     @Test
@@ -220,13 +220,13 @@ class PublicBookingServiceTest {
     @Test
     void notMoreThanTwoUpcomingOnlineBookingsPerPhone() {
         when(patients.findByPhoneDigits("7015551234")).thenReturn(List.of(patient(42L, "Сарсенова", "Айгерим")));
-        when(appointments.countUpcoming(anyCollection(), eq(AppointmentSource.WEBSITE), any())).thenReturn(2L);
+        when(appointments.countUpcoming(anyCollection(), eq(PublicBookingService.ONLINE_SOURCES), any())).thenReturn(2L);
 
         assertThatThrownBy(() -> service.book(request()))
                 .hasMessageContaining("уже есть 2")
                 .hasMessageContaining(settings.getPhone())
                 .satisfies(ex -> assertThat(statusOf(ex)).isEqualTo(HttpStatus.CONFLICT));
-        verify(appointmentService, never()).createOnline(any(), any());
+        verify(appointmentService, never()).createOnline(any(), any(), any());
     }
 
     @Test
@@ -238,7 +238,7 @@ class PublicBookingServiceTest {
         service.book(request(null, "+77015551234", true, null));
 
         ArgumentCaptor<AppointmentRequest> r = ArgumentCaptor.forClass(AppointmentRequest.class);
-        verify(appointmentService).createOnline(any(), r.capture());
+        verify(appointmentService).createOnline(any(), r.capture(), eq(AppointmentSource.WEBSITE));
         assertThat(r.getValue().doctorId()).isEqualTo(2L);
     }
 
@@ -286,6 +286,39 @@ class PublicBookingServiceTest {
         assertThatThrownBy(() -> service.ticket("token"))
                 .satisfies(ex -> assertThat(statusOf(ex)).isEqualTo(HttpStatus.CONFLICT));
         verify(word, never()).ticket(any(), any(), any());
+    }
+
+    @Test
+    void bookingFromTelegramCompletesOpenChatLead() {
+        Lead chatLead = new Lead();
+        chatLead.setId(31L);
+        chatLead.setSource(LeadSource.TELEGRAM);
+        chatLead.setStatus(LeadStatus.NEEDS_OPERATOR);
+        chatLead.setSummary("Спрашивал про цены");
+        when(leads.findById(31L)).thenReturn(Optional.of(chatLead));
+
+        PublicBookingService.OnlineBooking done = service.book(request(), LeadSource.TELEGRAM, 31L);
+
+        verify(appointmentService).createOnline(any(), any(), eq(AppointmentSource.MESSENGER));
+        assertThat(done.lead()).isSameAs(chatLead);
+        assertThat(chatLead.getStatus()).isEqualTo(LeadStatus.BOOKED);
+        assertThat(chatLead.awaitsConfirmation()).isTrue();
+        assertThat(chatLead.getSummary()).isEqualTo("Спрашивал про цены\nБолит зуб");
+        assertThat(done.info().token()).isEqualTo(chatLead.getPublicToken());
+    }
+
+    @Test
+    void closedChatLeadIsNotOverwritten() {
+        Lead booked = new Lead();
+        booked.setId(31L);
+        booked.setSource(LeadSource.WEBSITE);
+        booked.setStatus(LeadStatus.BOOKED);
+        when(leads.findById(31L)).thenReturn(Optional.of(booked));
+
+        PublicBookingService.OnlineBooking done = service.book(request(), LeadSource.WEBSITE, 31L);
+
+        assertThat(done.lead()).isNotSameAs(booked);
+        assertThat(done.lead().getSource()).isEqualTo(LeadSource.WEBSITE);
     }
 
     @Test

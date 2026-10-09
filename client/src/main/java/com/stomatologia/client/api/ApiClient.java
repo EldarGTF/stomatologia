@@ -60,6 +60,10 @@ public final class ApiClient {
         return read(send(builder(path).POST(json(body))), type);
     }
 
+    public <T> T post(String path, Object body, TypeReference<T> type) {
+        return read(send(builder(path).POST(json(body))), type);
+    }
+
     public void post(String path, Object body) {
         send(builder(path).POST(json(body)));
     }

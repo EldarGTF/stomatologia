@@ -138,10 +138,16 @@ public class AppointmentService {
      */
     @Transactional
     public Appointment createOnline(Patient patient, AppointmentRequest r) {
-        return book(patient, r, AppointmentSource.WEBSITE, null);
+        return createOnline(patient, r, AppointmentSource.WEBSITE);
     }
 
-    /** me == null — запись оформил сам клиент на сайте. */
+    /** То же для записи через ИИ-менеджера: source — сайт (чат на сайте) или мессенджер. */
+    @Transactional
+    public Appointment createOnline(Patient patient, AppointmentRequest r, AppointmentSource source) {
+        return book(patient, r, source, null);
+    }
+
+    /** me == null — запись оформил сам клиент на сайте или в мессенджере. */
     private Appointment book(Patient patient, AppointmentRequest r, AppointmentSource source, AuthUser me) {
         Doctor doctor = findDoctor(r.doctorId());
         ClinicService service = findActiveService(r.serviceId());
@@ -161,7 +167,7 @@ public class AppointmentService {
         appointments.saveAndFlush(a);
         writeAudit(a, AuditAction.CREATE, null, describe(a), me);
         log.info("Запись #{} создана: пациент {}, {}, источник «{}» (оформил {})", a.getId(), patient.getFullName(),
-                describe(a), source.title(), me == null ? "клиент на сайте" : me.username());
+                describe(a), source.title(), me == null ? "клиент онлайн" : me.username());
         if (clinic.current().requiresPrepayment(service.getPrice())) {
             invoices.onBookedWithPrepayment(a);
         }

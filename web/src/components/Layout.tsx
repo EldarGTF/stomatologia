@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet, useLocation } from 'react-router';
 import { useClinic } from '../hooks';
 import { useT } from '../i18n';
 import { brandName } from '../lib/format';
+import { ChatWidget } from './ChatWidget';
 import { Logo } from './Logo';
 
 export function Layout() {
@@ -84,6 +85,7 @@ export function Layout() {
           </div>
         </div>
       </footer>
+      <ChatWidget />
     </div>
   );
 }
