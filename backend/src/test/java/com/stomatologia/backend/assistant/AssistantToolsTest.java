@@ -15,6 +15,7 @@ import com.stomatologia.backend.domain.LeadSource;
 import com.stomatologia.backend.dto.AppointmentDtos.SlotDto;
 import com.stomatologia.backend.dto.PublicDtos.BookingInfo;
 import com.stomatologia.backend.dto.PublicDtos.BookingRequest;
+import com.stomatologia.backend.dto.PublicDtos.DoctorInfo;
 import com.stomatologia.backend.dto.PublicDtos.ServiceInfo;
 import com.stomatologia.backend.service.PublicBookingService;
 import com.stomatologia.backend.service.PublicBookingService.OnlineBooking;
@@ -64,6 +65,13 @@ class AssistantToolsTest {
     void setUp() {
         tools = new AssistantTools(catalog, booking, store, mapper, "https://eldar-dent.kz/");
         when(store.state(7L)).thenReturn(chat(null, null));
+        when(catalog.services()).thenReturn(List.of(
+                new ServiceInfo(2L, "Профессиональная гигиена", null, new BigDecimal("22500.00"), 60),
+                new ServiceInfo(5L, "Лечение кариеса", "Пломба", new BigDecimal("27500.00"), 60),
+                new ServiceInfo(4L, "Лечение пульпита", null, new BigDecimal("45000.00"), 90)));
+        when(catalog.doctors()).thenReturn(List.of(
+                new DoctorInfo(2L, "Иванова Елена Петровна", "Терапевт", "101"),
+                new DoctorInfo(3L, "Петров Андрей Викторович", "Стоматолог-хирург", "102")));
     }
 
     private static ChatState chat(String phone, Long leadId) {
@@ -92,15 +100,13 @@ class AssistantToolsTest {
     }
 
     @Test
-    void servicesHavePricesInTenge() throws Exception {
-        when(catalog.services()).thenReturn(List.of(
-                new ServiceInfo(5L, "Лечение кариеса", "Пломба", new BigDecimal("27500.00"), 60)));
-
+    void servicesHavePricesInTengeAndNoIds() throws Exception {
         JsonNode list = json(run("list_services", "{}"));
 
-        assertThat(list.get(0).path("id").asLong()).isEqualTo(5L);
-        assertThat(list.get(0).path("price").asText()).isEqualTo("27 500 ₸");
-        assertThat(list.get(0).path("duration_minutes").asInt()).isEqualTo(60);
+        assertThat(list.get(1).path("name").asText()).isEqualTo("Лечение кариеса");
+        assertThat(list.get(1).path("price").asText()).isEqualTo("27 500 ₸");
+        assertThat(list.get(1).path("duration_minutes").asInt()).isEqualTo(60);
+        assertThat(list.get(1).has("id")).isFalse();
     }
 
     @Test
@@ -109,13 +115,35 @@ class AssistantToolsTest {
                 slot(2L, "Иванова Е. П.", DAY, 10, 0), slot(3L, "Петров А. В.", DAY, 10, 0),
                 slot(3L, "Петров А. В.", DAY, 10, 30)));
 
-        JsonNode result = json(run("find_free_slots", "{\"service_id\":5,\"date\":\"" + DAY + "\"}"));
+        JsonNode result = json(run("find_free_slots", "{\"service\":\"Лечение кариеса\",\"date\":\"" + DAY + "\"}"));
 
+        assertThat(result.path("service").asText()).isEqualTo("Лечение кариеса");
         JsonNode slots = result.path("slots");
         assertThat(slots).hasSize(2);
         assertThat(slots.get(0).path("start_at").asText()).isEqualTo(DAY + "T10:00");
-        assertThat(slots.get(0).path("doctor_id").asLong()).isEqualTo(2L);
+        assertThat(slots.get(0).path("doctor").asText()).isEqualTo("Иванова Е. П.");
         assertThat(slots.get(1).path("time").asText()).isEqualTo("10:30");
+    }
+
+    @Test
+    void serviceIsFoundByNameAsModelWritesIt() {
+        List<ServiceInfo> all = catalog.services();
+        assertThat(AssistantTools.match(all, ServiceInfo::name, "лечение кариеса").id()).isEqualTo(5L);
+        assertThat(AssistantTools.match(all, ServiceInfo::name, "кариес").id()).isEqualTo(5L);
+        assertThat(AssistantTools.match(all, ServiceInfo::name, "Профессиональная чистка").id()).isEqualTo(2L);
+        assertThat(AssistantTools.match(all, ServiceInfo::name, "лечение зуба")).isNull();
+        assertThat(AssistantTools.match(all, ServiceInfo::name, "отбеливание")).isNull();
+    }
+
+    @Test
+    void ambiguousServiceIsReturnedToModelWithList() throws Exception {
+        ToolResult r = run("book_appointment", """
+                {"service":"лечение","start":"2030-01-10T10:00","last_name":"А","first_name":"Б",
+                 "phone":"+77015551234","consent":true}""");
+
+        assertThat(r.error()).isTrue();
+        assertThat(r.content()).contains("Лечение кариеса", "Лечение пульпита", "Профессиональная гигиена");
+        verify(booking, never()).book(any(), any(), any());
     }
 
     @Test
@@ -128,7 +156,7 @@ class AssistantToolsTest {
         when(catalog.slots(eq(5L), eq(2L), any())).thenAnswer(inv ->
                 List.of(slot(2L, "Иванова Е. П.", inv.getArgument(2), 9, 0)));
 
-        JsonNode result = json(run("find_free_slots", "{\"service_id\":\"5\",\"doctor_id\":2}"));
+        JsonNode result = json(run("find_free_slots", "{\"service\":\"кариес\",\"doctor\":\"Иванова\"}"));
 
         assertThat(result.path("days")).hasSize(AssistantTools.DAYS_TO_SUGGEST);
         assertThat(result.path("days").get(0).path("date").asText()).isEqualTo(today.plusDays(1).toString());
@@ -147,11 +175,13 @@ class AssistantToolsTest {
                         "Сарсенова Айгерим", true, start.minusHours(24), false)));
 
         JsonNode result = json(run("book_appointment", """
-                {"service_id":5,"doctor_id":2,"start":"%s","last_name":"Сарсенова","first_name":"Айгерим",
-                 "comment":"болит зуб","consent":true}""".formatted(start.toString())));
+                {"service":"Лечение кариеса","doctor":"Иванова","start":"%s","last_name":"Сарсенова",
+                 "first_name":"Айгерим","comment":"болит зуб","consent":true}""".formatted(start.toString())));
 
         ArgumentCaptor<BookingRequest> r = ArgumentCaptor.forClass(BookingRequest.class);
         verify(booking).book(r.capture(), eq(LeadSource.TELEGRAM), eq(31L));
+        assertThat(r.getValue().serviceId()).isEqualTo(5L);
+        assertThat(r.getValue().doctorId()).isEqualTo(2L);
         assertThat(r.getValue().phone()).isEqualTo("+77015551234");
         assertThat(r.getValue().startAt()).isEqualTo(start);
         assertThat(r.getValue().consent()).isTrue();
@@ -164,7 +194,7 @@ class AssistantToolsTest {
     @Test
     void bookingWithoutConsentIsRefused() throws Exception {
         ToolResult r = run("book_appointment", """
-                {"service_id":5,"start":"2030-01-10T10:00","last_name":"А","first_name":"Б","phone":"+77015551234",
+                {"service":"Лечение кариеса","start":"2030-01-10T10:00","last_name":"А","first_name":"Б","phone":"+77015551234",
                  "consent":false}""");
 
         assertThat(r.error()).isTrue();
@@ -175,7 +205,7 @@ class AssistantToolsTest {
     @Test
     void bookingWithoutPhoneAsksForIt() throws Exception {
         ToolResult r = run("book_appointment", """
-                {"service_id":5,"start":"2030-01-10T10:00","last_name":"А","first_name":"Б","consent":true}""");
+                {"service":"Лечение кариеса","start":"2030-01-10T10:00","last_name":"А","first_name":"Б","consent":true}""");
 
         assertThat(r.error()).isTrue();
         assertThat(r.content()).contains("телефон");
@@ -186,7 +216,7 @@ class AssistantToolsTest {
         when(booking.book(any(), any(), any())).thenThrow(ApiException.conflict("Это время уже заняли"));
 
         ToolResult r = run("book_appointment", """
-                {"service_id":5,"start":"2030-01-10T10:00","last_name":"А","first_name":"Б","phone":"+77015551234",
+                {"service":"Лечение кариеса","start":"2030-01-10T10:00","last_name":"А","first_name":"Б","phone":"+77015551234",
                  "consent":true}""");
 
         assertThat(r.error()).isTrue();
@@ -196,7 +226,7 @@ class AssistantToolsTest {
 
     @Test
     void wrongDateFormatIsExplained() throws Exception {
-        ToolResult r = run("find_free_slots", "{\"service_id\":5,\"date\":\"10 января\"}");
+        ToolResult r = run("find_free_slots", "{\"service\":\"Лечение кариеса\",\"date\":\"10 января\"}");
 
         assertThat(r.error()).isTrue();
         assertThat(r.content()).contains("YYYY-MM-DD");

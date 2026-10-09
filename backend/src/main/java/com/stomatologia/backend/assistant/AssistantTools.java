@@ -12,6 +12,8 @@ import com.stomatologia.backend.dto.AppointmentDtos.SlotDto;
 import com.stomatologia.backend.dto.PublicDtos.BookingInfo;
 import com.stomatologia.backend.dto.PublicDtos.BookingRequest;
 import com.stomatologia.backend.dto.PublicDtos.ClinicInfo;
+import com.stomatologia.backend.dto.PublicDtos.DoctorInfo;
+import com.stomatologia.backend.dto.PublicDtos.ServiceInfo;
 import com.stomatologia.backend.service.PublicBookingService;
 import com.stomatologia.backend.service.PublicBookingService.OnlineBooking;
 import com.stomatologia.backend.service.PublicCatalogService;
@@ -29,12 +31,15 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
+import java.util.function.Predicate;
 
 /**
  * Инструменты ИИ-менеджера. Данные берутся из тех же сервисов, что у сайта онлайн-записи, поэтому модель
@@ -53,6 +58,7 @@ public class AssistantTools {
     static final int SLOTS_PER_DAY = 8;
     static final int DAYS_TO_SUGGEST = 3;
     static final int SEARCH_DAYS = 30;
+    private static final String SERVICE_HINT = "название услуги точно как в list_services, например «Лечение кариеса»";
 
     private final PublicCatalogService catalog;
     private final PublicBookingService booking;
@@ -79,37 +85,38 @@ public class AssistantTools {
     public List<ToolSpec> specs() {
         return List.of(
                 new ToolSpec("get_clinic_info", "Адрес, телефон, e-mail клиники и правила онлайн-записи.", schema(Map.of())),
-                new ToolSpec("list_services", "Услуги клиники: id, название, описание, цена в тенге, длительность.",
+                new ToolSpec("list_services", "Услуги клиники: название, описание, цена в тенге, длительность.",
                         schema(Map.of())),
-                new ToolSpec("list_doctors", "Врачи, которые ведут приём: id, ФИО, специальность, кабинет.",
+                new ToolSpec("list_doctors", "Врачи, которые ведут приём: ФИО, специальность, кабинет.",
                         schema(Map.of())),
                 new ToolSpec("find_free_slots", """
                         Свободное время для записи на услугу. Без date — ближайшие дни со свободными окнами; \
-                        с date — окна в этот день. Без doctor_id — у любого врача.""",
+                        с date — окна в этот день. Без doctor — у любого врача.""",
                         schema(props(
-                                "service_id", prop("integer", "id услуги из list_services"),
-                                "doctor_id", prop("integer", "id врача из list_doctors, если клиент выбрал врача"),
-                                "date", prop("string", "дата в формате YYYY-MM-DD")), "service_id")),
+                                "service", prop("string", SERVICE_HINT),
+                                "doctor", prop("string", "фамилия врача, если клиент выбрал врача"),
+                                "date", prop("string", "дата в формате YYYY-MM-DD")), "service")),
                 new ToolSpec("book_appointment", """
                         Записать клиента на приём. Вызывать только после того, как клиент подтвердил детали \
-                        и дал согласие на обработку персональных данных. start — значение start_at из find_free_slots.""",
+                        и дал согласие на обработку персональных данных. start — значение start_at из find_free_slots. \
+                        Услуга — та, которую клиент подтвердил.""",
                         schema(props(
-                                "service_id", prop("integer", "id услуги"),
-                                "doctor_id", prop("integer", "id врача из выбранного окна"),
+                                "service", prop("string", SERVICE_HINT),
+                                "doctor", prop("string", "фамилия врача из выбранного окна"),
                                 "start", prop("string", "начало приёма, YYYY-MM-DDTHH:MM"),
                                 "last_name", prop("string", "фамилия пациента"),
                                 "first_name", prop("string", "имя пациента"),
                                 "phone", prop("string", "телефон пациента"),
                                 "comment", prop("string", "жалоба или пожелание клиента, кратко"),
                                 "consent", prop("boolean", "клиент согласился на обработку персональных данных")),
-                                "service_id", "start", "last_name", "first_name", "consent")),
+                                "service", "start", "last_name", "first_name", "consent")),
                 new ToolSpec("create_lead", """
                         Заявка на обратный звонок: подходящего времени нет, клиент хочет обсудить с администратором \
                         или просит перезвонить. Нужны имя, телефон и согласие на обработку персональных данных.""",
                         schema(props(
                                 "name", prop("string", "как обращаться к клиенту"),
                                 "phone", prop("string", "телефон клиента"),
-                                "service_id", prop("integer", "id услуги, если понятна"),
+                                "service", prop("string", "название услуги, если понятна"),
                                 "preferred_time", prop("string", "когда удобно, словами клиента"),
                                 "summary", prop("string", "суть обращения в одном-двух предложениях"),
                                 "consent", prop("boolean", "клиент согласился на обработку персональных данных")),
@@ -159,7 +166,6 @@ public class AssistantTools {
     private List<Map<String, Object>> services() {
         return catalog.services().stream().map(s -> {
             Map<String, Object> m = new LinkedHashMap<>();
-            m.put("id", s.id());
             m.put("name", s.name());
             if (s.description() != null && !s.description().isBlank()) {
                 m.put("description", s.description());
@@ -173,7 +179,6 @@ public class AssistantTools {
     private List<Map<String, Object>> doctors() {
         return catalog.doctors().stream().map(d -> {
             Map<String, Object> m = new LinkedHashMap<>();
-            m.put("id", d.id());
             m.put("name", d.fullName());
             m.put("specialty", d.specialtyName());
             m.put("room", d.roomNumber());
@@ -182,10 +187,12 @@ public class AssistantTools {
     }
 
     private Map<String, Object> freeSlots(JsonNode in) {
-        long serviceId = requiredLong(in, "service_id");
-        Long doctorId = optionalLong(in, "doctor_id");
+        ServiceInfo service = service(in, true);
+        long serviceId = service.id();
+        Long doctorId = doctorId(in);
         LocalDate date = optionalDate(in, "date");
         Map<String, Object> m = new LinkedHashMap<>();
+        m.put("service", service.name());
         if (date != null) {
             List<Map<String, Object>> slots = daySlots(serviceId, doctorId, date);
             m.put("date", date.toString());
@@ -229,7 +236,6 @@ public class AssistantTools {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("start_at", ISO_MINUTES.format(s.start()));
             m.put("time", TIME.format(s.start()));
-            m.put("doctor_id", s.doctorId());
             m.put("doctor", s.doctorName());
             result.add(m);
             if (result.size() == SLOTS_PER_DAY) {
@@ -251,7 +257,7 @@ public class AssistantTools {
         if (!in.path("consent").asBoolean(false)) {
             throw new ToolInputException("Нет согласия на обработку персональных данных — спроси клиента");
         }
-        BookingRequest r = new BookingRequest(requiredLong(in, "service_id"), optionalLong(in, "doctor_id"),
+        BookingRequest r = new BookingRequest(service(in, true).id(), doctorId(in),
                 requiredDateTime(in, "start"), requiredText(in, "last_name", 60), requiredText(in, "first_name", 60),
                 phone, cut(optionalText(in, "comment"), 500), true, null);
         OnlineBooking done = booking.book(r, chat.channel().leadSource(), chat.leadId());
@@ -283,8 +289,10 @@ public class AssistantTools {
         if (phone == null && chat.clientPhone() == null) {
             throw new ToolInputException("Не указан телефон — спроси номер, чтобы администратор мог перезвонить");
         }
+        ServiceInfo service = service(in, false);
         Long leadId = store.callbackLead(conversationId, cut(requiredText(in, "name", 100), 100), phone,
-                optionalLong(in, "service_id"), optionalText(in, "preferred_time"), requiredText(in, "summary", 2000));
+                service == null ? null : service.id(), optionalText(in, "preferred_time"),
+                requiredText(in, "summary", 2000));
         return Map.of("lead_created", true, "lead_id", leadId,
                 "next", "Администратор перезвонит в рабочее время");
     }
@@ -302,23 +310,61 @@ public class AssistantTools {
         return new DecimalFormat("#,##0.##", symbols).format(price) + " ₸";
     }
 
-    private static long requiredLong(JsonNode in, String field) {
-        Long v = optionalLong(in, field);
-        if (v == null) {
-            throw new ToolInputException("Не указан параметр " + field);
+    private ServiceInfo service(JsonNode in, boolean required) {
+        String query = optionalText(in, "service");
+        if (query == null) {
+            if (required) {
+                throw new ToolInputException("Не указана услуга (service) — название из list_services");
+            }
+            return null;
         }
-        return v;
+        List<ServiceInfo> all = catalog.services();
+        ServiceInfo found = match(all, ServiceInfo::name, query);
+        if (found == null) {
+            throw new ToolInputException("Услуга «" + query + "» не найдена или подходит несколько. Услуги клиники: "
+                    + String.join("; ", all.stream().map(ServiceInfo::name).toList())
+                    + ". Выбери подходящую или уточни у клиента.");
+        }
+        return found;
     }
 
-    private static Long optionalLong(JsonNode in, String field) {
-        JsonNode n = in.path(field);
-        if (n.isIntegralNumber()) {
-            return n.asLong();
+    private Long doctorId(JsonNode in) {
+        String query = optionalText(in, "doctor");
+        if (query == null) {
+            return null;
         }
-        if (n.isTextual() && n.asText().trim().matches("\\d+")) {
-            return Long.parseLong(n.asText().trim());
+        List<DoctorInfo> all = catalog.doctors();
+        DoctorInfo found = match(all, DoctorInfo::fullName, query);
+        if (found == null) {
+            throw new ToolInputException("Врач «" + query + "» не найден или подходит несколько. Врачи: "
+                    + String.join("; ", all.stream().map(DoctorInfo::fullName).toList()) + ".");
+        }
+        return found.id();
+    }
+
+    /**
+     * Ищет по названию так, как его пишет модель: точно, по первому слову (фамилии), по вхождению,
+     * по началам слов. Совпадение должно быть единственным — иначе null.
+     */
+    static <T> T match(List<T> items, Function<T, String> name, String query) {
+        String q = normalize(query);
+        List<Predicate<String>> rules = List.of(
+                n -> n.equals(q),
+                n -> n.split(" ")[0].equals(q.split(" ")[0]),
+                n -> n.contains(q) || q.contains(n),
+                n -> Arrays.stream(q.split(" ")).filter(w -> w.length() >= 3)
+                        .allMatch(w -> n.contains(w.substring(0, Math.min(w.length(), 5)))));
+        for (Predicate<String> rule : rules) {
+            List<T> found = items.stream().filter(i -> rule.test(normalize(name.apply(i)))).toList();
+            if (found.size() == 1) {
+                return found.get(0);
+            }
         }
         return null;
+    }
+
+    private static String normalize(String s) {
+        return s.toLowerCase(RU).replace('ё', 'е').replaceAll("[^\\p{L}\\p{N}]+", " ").trim();
     }
 
     private static String optionalText(JsonNode in, String field) {
