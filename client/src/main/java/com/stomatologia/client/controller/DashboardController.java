@@ -5,6 +5,7 @@ import com.stomatologia.client.model.AppointmentModels.AppointmentDto;
 import com.stomatologia.client.model.DashboardModels.DashboardDto;
 import com.stomatologia.client.model.DashboardModels.DayRevenue;
 import com.stomatologia.client.model.DashboardModels.DoctorLoad;
+import com.stomatologia.client.model.DashboardModels.LeadStats;
 import com.stomatologia.client.ui.Dialogs;
 import com.stomatologia.client.ui.Formats;
 import com.stomatologia.client.ui.Fx;
@@ -60,6 +61,10 @@ public class DashboardController {
     private Label revenueSub;
     @FXML
     private Label outstandingLabel;
+    @FXML
+    private Label leadsLabel;
+    @FXML
+    private Label leadsSub;
     @FXML
     private BarChart<String, Number> revenueChart;
     @FXML
@@ -128,6 +133,10 @@ public class DashboardController {
         revenueLabel.setText(Formats.money(d.revenueToday()));
         revenueSub.setText("с начала месяца: " + Formats.money(d.revenueMonth()));
         outstandingLabel.setText(Formats.money(d.outstanding()));
+        LeadStats leads = d.leads();
+        leadsLabel.setText(String.valueOf(leads.open()));
+        leadsSub.setText("новых сегодня " + leads.newToday() + " · дошли до записи за 30 дней: "
+                + leads.conversionPercent() + "%");
 
         showAlert(d.awaitingMark() > 0);
         alertLabel.setText("Приёмов, которые уже закончились, но не отмечены: " + d.awaitingMark()
@@ -204,6 +213,11 @@ public class DashboardController {
     @FXML
     private void onAppointments() {
         MainController.navigate(Screen.APPOINTMENTS);
+    }
+
+    @FXML
+    private void onLeads() {
+        MainController.navigate(Screen.LEADS);
     }
 
     @FXML

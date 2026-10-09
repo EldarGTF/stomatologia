@@ -173,6 +173,7 @@
 .kpi-sub {
     -fx-text-fill: -color-muted;
     -fx-font-size: 11px;
+    -fx-wrap-text: true;
 }
 
 .alert-warning {
@@ -393,6 +394,10 @@
     -fx-text-fill: -color-muted;
 }
 
+.table-row-cell:selected .badge-info {
+    -fx-background-color: -color-surface;
+}
+
 /* ---------- Диалоги ---------- */
 
 .dialog-pane {
@@ -533,4 +538,57 @@
 
 .scroll-pane > .viewport {
     -fx-background-color: transparent;
+}
+
+/* ---------- Заявки ---------- */
+
+.kpi-link {
+    -fx-cursor: hand;
+}
+
+.kpi-link:hover {
+    -fx-background-color: #f8fafc;
+}
+
+.leads-split {
+    -fx-background-color: transparent;
+    -fx-padding: 0;
+}
+
+.leads-split > .split-pane-divider {
+    -fx-background-color: transparent;
+    -fx-padding: 0 4 0 4;
+}
+
+.lead-summary {
+    -fx-background-color: -color-bg;
+    -fx-background-radius: 8;
+    -fx-padding: 10 12 10 12;
+}
+
+.chat {
+    -fx-background-color: -color-bg;
+    -fx-background-radius: 10;
+    -fx-padding: 12;
+}
+
+.chat-meta {
+    -fx-text-fill: -color-muted;
+    -fx-font-size: 11px;
+}
+
+.chat-bubble {
+    -fx-padding: 8 12 8 12;
+    -fx-background-radius: 12;
+}
+
+.chat-client {
+    -fx-background-color: -color-surface;
+    -fx-border-color: -color-border;
+    -fx-border-radius: 12;
+}
+
+.chat-clinic {
+    -fx-background-color: -color-primary-soft;
+    -fx-text-fill: #134e4a;
 }

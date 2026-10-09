@@ -2,6 +2,7 @@ package com.stomatologia.backend.dto;
 
 import com.stomatologia.backend.domain.Appointment;
 import com.stomatologia.backend.domain.AppointmentAudit;
+import com.stomatologia.backend.domain.AppointmentSource;
 import com.stomatologia.backend.domain.AppointmentStatus;
 import com.stomatologia.backend.domain.AuditAction;
 import jakarta.validation.constraints.NotNull;
@@ -19,7 +20,8 @@ public final class AppointmentDtos {
                                  Long doctorId, String doctorName, String specialtyName,
                                  Long roomId, String roomNumber, Long serviceId, String serviceName,
                                  BigDecimal price, LocalDateTime startAt, LocalDateTime endAt,
-                                 AppointmentStatus status, String notes, LocalDateTime createdAt) {
+                                 AppointmentStatus status, String notes, LocalDateTime createdAt,
+                                 AppointmentSource source) {
 
         public static AppointmentDto from(Appointment a) {
             return new AppointmentDto(a.getId(),
@@ -27,7 +29,7 @@ public final class AppointmentDtos {
                     a.getDoctor().getId(), a.getDoctor().getFullName(), a.getDoctor().getSpecialty().getName(),
                     a.getRoom().getId(), a.getRoom().getNumber(),
                     a.getService().getId(), a.getService().getName(), a.getService().getPrice(),
-                    a.getStartAt(), a.getEndAt(), a.getStatus(), a.getNotes(), a.getCreatedAt());
+                    a.getStartAt(), a.getEndAt(), a.getStatus(), a.getNotes(), a.getCreatedAt(), a.getSource());
         }
     }
 

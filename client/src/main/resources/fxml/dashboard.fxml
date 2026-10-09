@@ -51,6 +51,11 @@
                 <Label fx:id="outstandingLabel" styleClass="kpi-value"/>
                 <Label text="неоплаченные и частично оплаченные" styleClass="kpi-sub"/>
             </VBox>
+            <VBox styleClass="kpi-card,kpi-accent,kpi-link" HBox.hgrow="ALWAYS" onMouseClicked="#onLeads">
+                <Label text="Заявки ждут обработки" styleClass="kpi-title"/>
+                <Label fx:id="leadsLabel" styleClass="kpi-value"/>
+                <Label fx:id="leadsSub" styleClass="kpi-sub"/>
+            </VBox>
         </HBox>
 
         <HBox spacing="12">

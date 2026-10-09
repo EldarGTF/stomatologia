@@ -51,16 +51,18 @@ public class DashboardService {
     private final PaymentRepository payments;
     private final InvoiceRepository invoices;
     private final ClinicSettingsService clinic;
+    private final LeadService leads;
 
     public DashboardService(AppointmentRepository appointments, DoctorRepository doctors,
                             ScheduleRepository schedules, PaymentRepository payments, InvoiceRepository invoices,
-                            ClinicSettingsService clinic) {
+                            ClinicSettingsService clinic, LeadService leads) {
         this.appointments = appointments;
         this.doctors = doctors;
         this.schedules = schedules;
         this.payments = payments;
         this.invoices = invoices;
         this.clinic = clinic;
+        this.leads = leads;
     }
 
     @Transactional(readOnly = true)
@@ -99,7 +101,7 @@ public class DashboardService {
         return new DashboardDto(today, active.size(), scheduled, completed, noShow, cancelled, awaitingMark,
                 freeWindows,
                 WINDOW_MINUTES, revenueToday, revenueMonth, outstanding, revenueByDay(today), load, upcoming,
-                holidayName);
+                holidayName, leads.stats());
     }
 
     private List<DoctorLoad> doctorLoad(LocalDate date, List<Appointment> active, LocalDateTime now,

@@ -15,6 +15,7 @@ import static com.stomatologia.client.model.Role.REGISTRAR;
  */
 public enum Screen {
     DASHBOARD("Dashboard", "dashboard", ADMIN, REGISTRAR),
+    LEADS("Заявки", "leads", ADMIN, REGISTRAR),
     PATIENTS("Пациенты", "patients", ADMIN, REGISTRAR, DOCTOR),
     DOCTORS("Врачи", "doctors", ADMIN, REGISTRAR, PATIENT),
     SCHEDULE("Расписание", "schedule", ADMIN, REGISTRAR, DOCTOR),

@@ -30,6 +30,14 @@ class ScreenTest {
     }
 
     @Test
+    void leadsForAdministrationOnly() {
+        assertThat(Screen.LEADS.allowedFor(Role.ADMIN)).isTrue();
+        assertThat(Screen.LEADS.allowedFor(Role.REGISTRAR)).isTrue();
+        assertThat(Screen.LEADS.allowedFor(Role.DOCTOR)).isFalse();
+        assertThat(Screen.LEADS.allowedFor(Role.PATIENT)).isFalse();
+    }
+
+    @Test
     void clinicSettingsOnlyForAdmin() {
         assertThat(Screen.SETTINGS.allowedFor(Role.ADMIN)).isTrue();
         assertThat(Screen.SETTINGS.allowedFor(Role.REGISTRAR)).isFalse();

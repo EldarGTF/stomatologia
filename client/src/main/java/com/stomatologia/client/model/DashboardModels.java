@@ -15,7 +15,10 @@ public final class DashboardModels {
                                int cancelled, int awaitingMark, int freeWindows, int windowMinutes,
                                BigDecimal revenueToday, BigDecimal revenueMonth, BigDecimal outstanding,
                                List<DayRevenue> revenueByDay, List<DoctorLoad> doctorLoad,
-                               List<AppointmentDto> upcoming, String holidayName) {
+                               List<AppointmentDto> upcoming, String holidayName, LeadStats leads) {
+    }
+
+    public record LeadStats(int newToday, int open, int conversionPercent) {
     }
 
     public record DayRevenue(LocalDate date, BigDecimal amount) {

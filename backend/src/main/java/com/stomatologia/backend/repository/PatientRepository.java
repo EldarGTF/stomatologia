@@ -21,4 +21,12 @@ public interface PatientRepository extends JpaRepository<Patient, Long> {
     List<Patient> search(@Param("q") String query);
 
     Optional<Patient> findByUserId(Long userId);
+
+    /** Пациенты, у которых последние 10 цифр телефона совпадают: «8 701…», «+7 (701)…» и «701…» — один номер. */
+    @Query(value = """
+            select * from patients
+            where right(regexp_replace(coalesce(phone, ''), '[^0-9]', '', 'g'), 10) = :digits
+            order by last_name, first_name
+            """, nativeQuery = true)
+    List<Patient> findByPhoneDigits(@Param("digits") String lastTenDigits);
 }

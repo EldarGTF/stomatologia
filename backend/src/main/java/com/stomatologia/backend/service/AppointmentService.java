@@ -3,6 +3,7 @@ package com.stomatologia.backend.service;
 import com.stomatologia.backend.common.ApiException;
 import com.stomatologia.backend.domain.Appointment;
 import com.stomatologia.backend.domain.AppointmentAudit;
+import com.stomatologia.backend.domain.AppointmentSource;
 import com.stomatologia.backend.domain.AppointmentStatus;
 import com.stomatologia.backend.domain.AuditAction;
 import com.stomatologia.backend.domain.ClinicService;
@@ -113,6 +114,12 @@ public class AppointmentService {
 
     @Transactional
     public AppointmentDto create(AppointmentRequest r) {
+        return create(r, CurrentUser.get().is(Role.PATIENT) ? AppointmentSource.PATIENT_ACCOUNT
+                : AppointmentSource.REGISTRY);
+    }
+
+    @Transactional
+    public AppointmentDto create(AppointmentRequest r, AppointmentSource source) {
         AuthUser me = CurrentUser.get();
         if (me.is(Role.PATIENT) && r.patientId() != null && !r.patientId().equals(me.patientId())) {
             throw ApiException.forbidden("Пациент может записаться только сам");
@@ -133,13 +140,14 @@ public class AppointmentService {
         a.setStartAt(r.startAt());
         a.setEndAt(r.startAt().plusMinutes(service.getDurationMinutes()));
         a.setNotes(trimToNull(r.notes()));
+        a.setSource(source);
         a.setCreatedBy(users.getReferenceById(me.id()));
         ensureBookable(a, null);
 
         appointments.saveAndFlush(a);
         writeAudit(a, AuditAction.CREATE, null, describe(a), me);
-        log.info("Запись #{} создана: пациент {}, {} (оформил {})", a.getId(), patient.getFullName(), describe(a),
-                me.username());
+        log.info("Запись #{} создана: пациент {}, {}, источник «{}» (оформил {})", a.getId(), patient.getFullName(),
+                describe(a), source.title(), me.username());
         if (clinic.current().requiresPrepayment(service.getPrice())) {
             invoices.onBookedWithPrepayment(a);
         }

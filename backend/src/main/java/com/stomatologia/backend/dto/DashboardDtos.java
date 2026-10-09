@@ -1,6 +1,7 @@
 package com.stomatologia.backend.dto;
 
 import com.stomatologia.backend.dto.AppointmentDtos.AppointmentDto;
+import com.stomatologia.backend.dto.LeadDtos.LeadStats;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -15,7 +16,8 @@ public final class DashboardDtos {
     public record DashboardDto(LocalDate date, int appointmentsToday, int scheduled, int completed, int noShow,
                                int cancelled, int awaitingMark, int freeWindows, int windowMinutes, BigDecimal revenueToday,
                                BigDecimal revenueMonth, BigDecimal outstanding, List<DayRevenue> revenueByDay,
-                               List<DoctorLoad> doctorLoad, List<AppointmentDto> upcoming, String holidayName) {
+                               List<DoctorLoad> doctorLoad, List<AppointmentDto> upcoming, String holidayName,
+                               LeadStats leads) {
     }
 
     public record DayRevenue(LocalDate date, BigDecimal amount) {

@@ -49,6 +49,7 @@ public class BookingForm extends VBox {
     private static final SpecialtyDto ALL_SPECIALTIES = new SpecialtyDto(null, "Все специальности");
 
     private final boolean patientMode = Session.hasRole(Role.PATIENT);
+    private final boolean selectPatient;
 
     private final ObservableList<PatientDto> patients = FXCollections.observableArrayList();
     private final FilteredList<PatientDto> filteredPatients = new FilteredList<>(patients);
@@ -76,6 +77,12 @@ public class BookingForm extends VBox {
     private int slotRequest;
 
     public BookingForm() {
+        this(true);
+    }
+
+    /** selectPatient = false — пациента выбирает вызывающий диалог (запись по заявке). */
+    public BookingForm(boolean selectPatient) {
+        this.selectPatient = selectPatient;
         setSpacing(14);
         GridPane grid = new GridPane();
         grid.setHgap(12);
@@ -88,7 +95,7 @@ public class BookingForm extends VBox {
         grid.getColumnConstraints().addAll(labels, fields);
 
         int row = 0;
-        if (!patientMode) {
+        if (!patientMode && selectPatient) {
             patientSearch.setPromptText("Поиск по ФИО или телефону");
             patientSearch.textProperty().addListener((obs, o, n) -> filterPatients(n));
             patientCombo.setPromptText("Выберите пациента");
@@ -182,6 +189,26 @@ public class BookingForm extends VBox {
         });
     }
 
+    /** Подставляет врача, услугу и время, выбранные клиентом в заявке; пустые значения пропускаются. */
+    public void presetChoice(Long doctorId, Long serviceId, LocalDateTime start, String comment) {
+        whenReady(() -> {
+            specialtyCombo.setValue(ALL_SPECIALTIES);
+            if (doctorId != null) {
+                doctors.stream().filter(d -> d.id().equals(doctorId)).findFirst().ifPresent(doctorCombo::setValue);
+            }
+            if (serviceId != null) {
+                serviceCombo.getItems().stream().filter(s -> s.id().equals(serviceId)).findFirst()
+                        .ifPresent(serviceCombo::setValue);
+            }
+            if (start != null && bookable(start.toLocalDate())) {
+                pendingSelection = start;
+                datePicker.setValue(start.toLocalDate());
+            }
+            notes.setText(comment);
+            loadSlots();
+        });
+    }
+
     public void presetPatient(Long patientId) {
         whenReady(() -> patients.stream().filter(p -> p.id().equals(patientId)).findFirst()
                 .ifPresent(patientCombo::setValue));
@@ -190,7 +217,7 @@ public class BookingForm extends VBox {
     /** Собирает запрос; при незаполненных полях бросает исключение с понятным сообщением. */
     public AppointmentRequest request() {
         PatientDto patient = patientCombo.getValue();
-        if (!patientMode && patient == null) {
+        if (!patientMode && selectPatient && patient == null) {
             throw new IllegalArgumentException("Выберите пациента");
         }
         if (doctorCombo.getValue() == null) {
@@ -203,7 +230,7 @@ public class BookingForm extends VBox {
         if (slot == null) {
             throw new IllegalArgumentException("Выберите свободное время");
         }
-        Long patientId = patientMode ? Session.user().patientId() : patient.id();
+        Long patientId = patientMode ? Session.user().patientId() : selectPatient ? patient.id() : null;
         return new AppointmentRequest(patientId, doctorCombo.getValue().id(), serviceCombo.getValue().id(),
                 slot.start(), Formats.blankToNull(notes.getText()));
     }
@@ -223,7 +250,7 @@ public class BookingForm extends VBox {
             });
             List<ServiceDto> sv = api.get("/api/services?active=true", new TypeReference<List<ServiceDto>>() {
             });
-            List<PatientDto> p = patientMode ? List.of()
+            List<PatientDto> p = patientMode || !selectPatient ? List.of()
                     : api.get("/api/patients", new TypeReference<List<PatientDto>>() {
                     });
             SettingsDto settings = api.get("/api/settings", SettingsDto.class);

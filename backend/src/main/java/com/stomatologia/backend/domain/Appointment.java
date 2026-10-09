@@ -58,6 +58,10 @@ public class Appointment {
     @Column(length = 500)
     private String notes;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private AppointmentSource source = AppointmentSource.REGISTRY;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by")
     private User createdBy;

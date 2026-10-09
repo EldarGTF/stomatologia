@@ -32,6 +32,7 @@ import javafx.scene.control.TextField;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
 
@@ -350,7 +351,11 @@ public class AppointmentsController {
     }
 
     static String ticketFileName(AppointmentDto a) {
-        return "Талон " + Formats.DATE_TIME.format(a.startAt()).replace(':', '-') + " " + a.patientName() + ".docx";
+        return ticketFileName(a.startAt(), a.patientName());
+    }
+
+    static String ticketFileName(LocalDateTime startAt, String patientName) {
+        return "Талон " + Formats.DATE_TIME.format(startAt).replace(':', '-') + " " + patientName + ".docx";
     }
 
     @FXML
