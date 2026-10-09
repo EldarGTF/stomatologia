@@ -37,7 +37,7 @@ public class ReportController {
     }
 
     @GetMapping("/invoices/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'REGISTRAR', 'PATIENT')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'REGISTRAR')")
     public ResponseEntity<byte[]> invoice(@PathVariable Long id) {
         return file(reportService.invoice(id), "Счёт_" + id + ".docx", DOCX);
     }

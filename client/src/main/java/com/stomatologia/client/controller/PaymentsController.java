@@ -105,6 +105,8 @@ public class PaymentsController {
         payButton.setManaged(staff);
         cancelButton.setVisible(admin);
         cancelButton.setManaged(admin);
+        wordButton.setVisible(staff);
+        wordButton.setManaged(staff);
         table.getSelectionModel().selectedItemProperty().addListener((obs, o, n) -> updateButtons(n));
         updateButtons(null);
 
