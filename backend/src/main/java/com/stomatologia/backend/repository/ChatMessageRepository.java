@@ -32,6 +32,20 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
 
     List<ChatMessage> findByLeadIdAndRoleNotAndIdGreaterThanOrderById(Long leadId, MessageRole role, Long afterId);
 
+    @Query("select coalesce(max(m.id), 0) from ChatMessage m")
+    long findMaxId();
+
+    /** Сообщения клиентов в разговорах, которые сейчас ведёт оператор, — по текущей заявке разговора. */
+    @Query("""
+            select m from ChatMessage m join fetch m.conversation c join fetch m.lead l
+            where m.id > :after and m.id <= :last
+              and m.role = com.stomatologia.backend.domain.MessageRole.USER
+              and c.mode = com.stomatologia.backend.domain.ConversationMode.OPERATOR
+              and c.lead = l
+            order by m.id
+            """)
+    List<ChatMessage> findClientMessagesForOperator(@Param("after") long after, @Param("last") long last);
+
     long countByConversationIdAndRoleAndSentAtGreaterThanEqual(Long conversationId, MessageRole role,
                                                                LocalDateTime since);
 }

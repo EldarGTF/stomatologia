@@ -62,4 +62,14 @@ public final class Formats {
     public static String blankToNull(String s) {
         return s == null || s.isBlank() ? null : s.trim();
     }
+
+    /** Форма слова для числа: 1 событие, 2 события, 5 событий. */
+    public static String plural(long n, String one, String few, String many) {
+        long tens = Math.abs(n) % 100;
+        long units = tens % 10;
+        if (tens >= 11 && tens <= 14) {
+            return many;
+        }
+        return units == 1 ? one : units >= 2 && units <= 4 ? few : many;
+    }
 }

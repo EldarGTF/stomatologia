@@ -4,6 +4,7 @@ import com.stomatologia.client.DentalClinicApp;
 import com.stomatologia.client.api.Session;
 import com.stomatologia.client.model.Role;
 import com.stomatologia.client.ui.Dialogs;
+import com.stomatologia.client.ui.Notifier;
 import com.stomatologia.client.ui.Screen;
 import javafx.fxml.FXML;
 import javafx.geometry.Pos;
@@ -62,6 +63,9 @@ public class MainController {
             navBox.getChildren().add(button);
         }
         open(Screen.home(role));
+        if (role == Role.ADMIN || role == Role.REGISTRAR) {
+            Notifier.start(DentalClinicApp.stage());
+        }
     }
 
     private void open(Screen screen) {
@@ -98,6 +102,7 @@ public class MainController {
     @FXML
     private void onLogout() {
         if (Dialogs.confirm("Выйти из системы?")) {
+            Notifier.stop();
             Session.clear();
             instance = null;
             DentalClinicApp.showLogin();

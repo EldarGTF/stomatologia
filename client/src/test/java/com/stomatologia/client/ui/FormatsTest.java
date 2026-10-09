@@ -25,6 +25,13 @@ class FormatsTest {
         assertThat(Formats.money(new BigDecimal(amount))).isEqualTo(expected);
     }
 
+    @ParameterizedTest
+    @CsvSource({"1, событие", "2, события", "4, события", "5, событий", "11, событий", "14, событий",
+            "21, событие", "22, события", "25, событий", "111, событий", "0, событий"})
+    void wordFormFollowsNumber(long n, String expected) {
+        assertThat(Formats.plural(n, "событие", "события", "событий")).isEqualTo(expected);
+    }
+
     @Test
     void emptyValuesBecomeEmptyStrings() {
         assertThat(Formats.money(null)).isEmpty();

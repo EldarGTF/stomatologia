@@ -65,6 +65,8 @@ public class LeadsController {
     private static final StatusOption OPEN = new StatusOption("Ждут обработки", null, true);
     private static final StatusOption ALL = new StatusOption("Все заявки", null, false);
 
+    private static Long requestedLead;
+
     @FXML
     private Label countLabel;
     @FXML
@@ -93,6 +95,14 @@ public class LeadsController {
     private VBox chatBox;
     private Long chatLeadId;
     private int chatSize;
+    private Long openedLead;
+    private Long pendingSelect;
+
+    /** Открыть раздел с выбранной заявкой, например из уведомления; null — просто раздел. */
+    public static void open(Long leadId) {
+        requestedLead = leadId;
+        MainController.navigate(Screen.LEADS);
+    }
 
     @FXML
     private void initialize() {
@@ -149,7 +159,11 @@ public class LeadsController {
                 showDetail(n);
             }
         });
-        statusFilter.valueProperty().addListener((obs, o, n) -> load(true, selectedId()));
+        statusFilter.valueProperty().addListener((obs, o, n) -> {
+            Long select = pendingSelect != null ? pendingSelect : selectedId();
+            pendingSelect = null;
+            load(true, select);
+        });
         sourceFilter.valueProperty().addListener((obs, o, n) -> load(true, selectedId()));
         searchField.textProperty().addListener((obs, o, n) -> applySearch());
 
@@ -164,7 +178,9 @@ public class LeadsController {
             }
         });
         showDetail(null);
-        load(true, null);
+        openedLead = requestedLead;
+        requestedLead = null;
+        load(true, openedLead);
     }
 
     private void load(boolean manual, Long selectId) {
@@ -182,6 +198,13 @@ public class LeadsController {
                 select(selectId);
             } finally {
                 reloading = false;
+            }
+            Long requested = openedLead;
+            openedLead = null;
+            if (requested != null && requested.equals(selectId) && option != ALL
+                    && list.stream().noneMatch(l -> l.id().equals(requested))) {
+                pendingSelect = requested;
+                statusFilter.setValue(ALL);
             }
             updatedLabel.setText("обновлено в " + Formats.TIME.format(LocalTime.now()));
         }, ex -> {

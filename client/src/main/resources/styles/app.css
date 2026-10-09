@@ -597,3 +597,46 @@
     -fx-background-color: #ffedd5;
     -fx-text-fill: #7c2d12;
 }
+
+/* Всплывающие уведомления (отдельное окно Popup) */
+.notice {
+    -fx-background-color: #ffffff;
+    -fx-background-radius: 10;
+    -fx-border-color: #e2e8f0 #e2e8f0 #e2e8f0 #0f766e;
+    -fx-border-width: 1 1 1 4;
+    -fx-border-radius: 10;
+    -fx-padding: 10 12 10 12;
+    -fx-cursor: hand;
+    -fx-effect: dropshadow(gaussian, rgba(15, 23, 42, 0.22), 16, 0.1, 0, 4);
+}
+
+.notice:hover {
+    -fx-background-color: #f0fdfa;
+}
+
+.notice-title {
+    -fx-font-weight: bold;
+    -fx-font-size: 13px;
+    -fx-text-fill: #0f172a;
+}
+
+.notice-text {
+    -fx-font-size: 13px;
+    -fx-text-fill: #334155;
+}
+
+.notice-hint {
+    -fx-font-size: 11px;
+    -fx-text-fill: #0f766e;
+}
+
+.notice-close {
+    -fx-background-color: transparent;
+    -fx-text-fill: #94a3b8;
+    -fx-padding: 0 4 0 4;
+    -fx-font-size: 11px;
+}
+
+.notice-close:hover {
+    -fx-text-fill: #0f172a;
+}
