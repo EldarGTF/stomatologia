@@ -66,6 +66,13 @@ public class ConversationStore {
         if (c.getClientName() == null && clientName != null && !clientName.isBlank()) {
             c.setClientName(cut(clientName.trim(), 100));
         }
+        if (c.getLead() == null) {
+            Lead l = openLead(c);
+            l.setSummary("Написал в " + c.getChannel().title() + ": " + cut(text, 300));
+            leads.saveAndFlush(l);
+            c.setLead(l);
+            log.info("Разговор #{} ({}): новая заявка #{}", c.getId(), c.getChannel().title(), l.getId());
+        }
         ChatMessage m = save(c, MessageRole.USER, text, null);
         long today = messages.countByConversationIdAndRoleAndSentAtGreaterThanEqual(c.getId(), MessageRole.USER,
                 LocalDate.now().atStartOfDay());

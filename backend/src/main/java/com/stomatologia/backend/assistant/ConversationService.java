@@ -29,6 +29,7 @@ import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 /**
  * Разговор с клиентом в любом канале: сохраняет сообщение, спрашивает модель, выполняет её инструменты
@@ -42,6 +43,12 @@ public class ConversationService {
     static final int MAX_TOOL_STEPS = 6;
     static final int MAX_TEXT = 2000;
     private static final int LOCK_STRIPES = 64;
+    private static final Pattern BOOKING_CLAIM = Pattern.compile(
+            "записан[аы]?\\b|записал[аи]?\\b|перезаписал|запись\\s+(оформлен|создан|подтвержден|готова)",
+            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CHARACTER_CLASS);
+    static final String NOT_BOOKED = "[Служебное сообщение системы, клиент его не видит] Запись НЕ создана: "
+            + "book_appointment не вызывался или вернул ошибку. Если клиент подтвердил время и согласие — вызови "
+            + "find_free_slots и book_appointment сейчас. Иначе ответь клиенту заново, не утверждая, что он записан.";
 
     private final ChatModel model;
     private final AssistantTools tools;
@@ -121,16 +128,31 @@ public class ConversationService {
                 case OPERATOR -> AssistantTurn.text("Администратор: " + m.getText());
             });
         }
+        boolean booked = chat.appointmentStart() != null;
+        boolean corrected = false;
         for (int step = 0; step < MAX_TOOL_STEPS; step++) {
             ModelReply reply = model.reply(system, messages, tools.specs());
             if (!reply.wantsTools()) {
-                return clean(reply.text());
+                String text = clean(reply.text());
+                if (booked || !claimsBooking(text)) {
+                    return text;
+                }
+                log.warn("Разговор #{}: модель сообщила о записи, не вызвав book_appointment: {}", conversationId, text);
+                if (corrected) {
+                    return null;
+                }
+                corrected = true;
+                messages.add(AssistantTurn.text(text));
+                messages.add(new UserText(NOT_BOOKED));
+                continue;
             }
             messages.add(new AssistantTurn(reply.text(), reply.toolCalls()));
             List<ToolResult> results = new ArrayList<>();
             for (ToolCall call : reply.toolCalls()) {
                 log.info("Разговор #{}: инструмент {} {}", conversationId, call.name(), call.input());
-                results.add(tools.execute(call, conversationId));
+                ToolResult result = tools.execute(call, conversationId);
+                booked |= call.name().equals("book_appointment") && !result.error();
+                results.add(result);
             }
             messages.add(new ToolResults(results));
         }
@@ -174,6 +196,10 @@ public class ConversationService {
 
     private Object lockFor(ChatChannel channel, String chatId) {
         return locks[Math.floorMod((channel.name() + ":" + chatId).hashCode(), LOCK_STRIPES)];
+    }
+
+    static boolean claimsBooking(String text) {
+        return text != null && BOOKING_CLAIM.matcher(text).find();
     }
 
     /** Модель иногда всё же присылает Markdown — в мессенджере он выглядит как мусор. */

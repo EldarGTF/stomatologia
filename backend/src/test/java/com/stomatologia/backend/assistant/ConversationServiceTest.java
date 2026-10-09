@@ -128,7 +128,8 @@ class ConversationServiceTest {
         verify(model).reply(system.capture(), anyList(), anyList());
         assertThat(system.getValue())
                 .contains("Стоматология «Eldar»", "Павлодар, ул. Назарбаева, 79", "+7 (777) 081-29-09")
-                .contains("Telegram", "Поделиться контактом", "103", "handoff_to_operator", "Айгерим");
+                .contains("Telegram", "Поделиться контактом", "103", "handoff_to_operator", "Айгерим")
+                .contains("Записи через этот чат нет");
     }
 
     @Test
@@ -148,6 +149,58 @@ class ConversationServiceTest {
         List<ModelMessage> second = history.getAllValues().get(1);
         assertThat(second.get(0)).isEqualTo(new UserText("Сколько стоит чистка?"));
         assertThat(second.get(second.size() - 1)).isInstanceOf(ToolResults.class);
+    }
+
+    @Test
+    void bookingClaimWithoutToolIsSentBackToModel() {
+        List<List<ModelMessage>> seen = new ArrayList<>();
+        when(model.reply(anyString(), anyList(), anyList())).thenAnswer(inv -> {
+            seen.add(List.copyOf(inv.getArgument(1)));
+            return seen.size() == 1
+                    ? new ModelReply("Спасибо! Вы записаны на сегодня в 15:00.", List.of())
+                    : new ModelReply("Записываю на 15:00? Подтвердите согласие на обработку данных.", List.of());
+        });
+
+        Reply reply = send("Да");
+
+        assertThat(reply.texts()).containsExactly("Записываю на 15:00? Подтвердите согласие на обработку данных.");
+        assertThat(seen.get(1).get(seen.get(1).size() - 1)).isEqualTo(new UserText(ConversationService.NOT_BOOKED));
+        verify(store, never()).handoff(anyLong(), anyString());
+    }
+
+    @Test
+    void repeatedBookingClaimWithoutToolHandsOff() {
+        when(model.reply(anyString(), anyList(), anyList()))
+                .thenReturn(new ModelReply("Ваша запись оформлена!", List.of()));
+
+        Reply reply = send("Да");
+
+        verify(model, times(2)).reply(anyString(), anyList(), anyList());
+        verify(store).handoff(eq(7L), anyString());
+        assertThat(reply.texts().get(0)).contains("администратору");
+    }
+
+    @Test
+    void realBookingIsAnnounced() throws Exception {
+        ToolCall call = new ToolCall("toolu_1", "book_appointment", mapper.readTree("{}"));
+        when(model.reply(anyString(), anyList(), anyList()))
+                .thenReturn(new ModelReply("", List.of(call)))
+                .thenReturn(new ModelReply("Готово, вы записаны на сегодня в 15:00.", List.of()));
+        when(tools.execute(call, 7L)).thenReturn(new ToolResult("toolu_1", "{\"when\":\"сегодня 15:00\"}", false));
+
+        Reply reply = send("Да");
+
+        assertThat(reply.texts()).containsExactly("Готово, вы записаны на сегодня в 15:00.");
+        verify(model, times(2)).reply(anyString(), anyList(), anyList());
+    }
+
+    @Test
+    void bookingClaimsAreRecognized() {
+        assertThat(ConversationService.claimsBooking("Спасибо! Вы записаны на завтра")).isTrue();
+        assertThat(ConversationService.claimsBooking("Записала вас к Ивановой")).isTrue();
+        assertThat(ConversationService.claimsBooking("Ваша запись оформлена.")).isTrue();
+        assertThat(ConversationService.claimsBooking("Записываю вас на 10:00?")).isFalse();
+        assertThat(ConversationService.claimsBooking("Есть время завтра в 10:00 и 11:30")).isFalse();
     }
 
     @Test
