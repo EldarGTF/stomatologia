@@ -79,7 +79,20 @@ public final class LeadModels {
                           LocalDateTime preferredStart, String preferredText, String summary, LocalDateTime consentAt,
                           Long patientId, String patientName, Long appointmentId, LocalDateTime appointmentStart,
                           String assignedTo, String rejectReason, LocalDateTime createdAt, LocalDateTime updatedAt,
-                          boolean hasConversation) {
+                          boolean hasConversation, LocalDateTime confirmedAt, boolean awaitsConfirmation) {
+
+        /** Онлайн-запись с сайта, которую администратор ещё не подтвердил звонком, тоже ждёт обработки. */
+        public boolean needsAttention() {
+            return status.open() || awaitsConfirmation;
+        }
+
+        public String statusTitle() {
+            return awaitsConfirmation ? "Не подтверждена" : status.title();
+        }
+
+        public String statusStyle() {
+            return awaitsConfirmation ? "badge-warning" : status.styleClass();
+        }
     }
 
     public record LeadRequest(LeadSource source, String name, String phone, Long serviceId, Long doctorId,

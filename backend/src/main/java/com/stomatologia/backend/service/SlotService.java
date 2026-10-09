@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
@@ -49,9 +50,24 @@ public class SlotService {
         this.clinic = clinic;
     }
 
+    /** Число свободных окон в день — для календаря онлайн-записи. */
+    public record DayAvailability(LocalDate date, int freeSlots) {
+    }
+
+    static final int MAX_AVAILABILITY_DAYS = 31;
+
     @Transactional(readOnly = true)
     public List<SlotDto> freeSlots(Long doctorId, Long serviceId, LocalDate date) {
-        Doctor doctor = doctors.findById(doctorId).orElseThrow(() -> ApiException.notFound("Врач не найден"));
+        return freeSlots(doctorId, serviceId, date, isPatient());
+    }
+
+    /**
+     * Свободные окна на день у врача или у всех врачей (doctorId == null), по времени.
+     * selfService — клиент записывается сам, окна раньше min_lead_hours не показываются.
+     */
+    @Transactional(readOnly = true)
+    public List<SlotDto> freeSlots(Long doctorId, Long serviceId, LocalDate date, boolean selfService) {
+        List<Doctor> candidates = candidates(doctorId);
         ClinicService service = catalog.find(serviceId);
         ClinicSettings settings = clinic.current();
         LocalDateTime now = LocalDateTime.now();
@@ -60,8 +76,48 @@ public class SlotService {
         }
         List<Appointment> dayAppointments = appointments.findActiveBetween(date.atStartOfDay(),
                 date.plusDays(1).atStartOfDay());
-        return slotsFor(doctor, service, date, dayAppointments, earliestStart(settings, now),
-                settings.getSlotStepMinutes());
+        LocalDateTime notBefore = earliestStart(settings, now, selfService);
+        return candidates.stream()
+                .flatMap(d -> slotsFor(d, service, date, dayAppointments, notBefore,
+                        settings.getSlotStepMinutes()).stream())
+                .sorted(Comparator.comparing(SlotDto::start).thenComparing(SlotDto::doctorName))
+                .toList();
+    }
+
+    /** Сколько свободных окон в каждый день периода (не длиннее месяца), с учётом горизонта и праздников. */
+    @Transactional(readOnly = true)
+    public List<DayAvailability> availability(Long serviceId, Long doctorId, LocalDate from, LocalDate to,
+                                              boolean selfService) {
+        if (to.isBefore(from) || from.plusDays(MAX_AVAILABILITY_DAYS).isBefore(to)) {
+            throw ApiException.badRequest("Период — не больше " + MAX_AVAILABILITY_DAYS + " дней");
+        }
+        List<Doctor> candidates = candidates(doctorId);
+        ClinicService service = catalog.find(serviceId);
+        ClinicSettings settings = clinic.current();
+        LocalDateTime now = LocalDateTime.now();
+        LocalDate first = from.isBefore(now.toLocalDate()) ? now.toLocalDate() : from;
+        LocalDate last = to.isAfter(settings.lastBookableDay(now.toLocalDate()))
+                ? settings.lastBookableDay(now.toLocalDate()) : to;
+        if (last.isBefore(first)) {
+            return List.of();
+        }
+        Set<LocalDate> holidays = clinic.holidayDates(first, last);
+        List<Appointment> busy = appointments.findActiveBetween(first.atStartOfDay(), last.plusDays(1).atStartOfDay());
+        LocalDateTime notBefore = earliestStart(settings, now, selfService);
+        List<DayAvailability> days = new ArrayList<>();
+        for (LocalDate day = first; !day.isAfter(last); day = day.plusDays(1)) {
+            if (holidays.contains(day)) {
+                continue;
+            }
+            LocalDate date = day;
+            int count = candidates.stream()
+                    .mapToInt(d -> slotsFor(d, service, date, busy, notBefore, settings.getSlotStepMinutes()).size())
+                    .sum();
+            if (count > 0) {
+                days.add(new DayAvailability(date, count));
+            }
+        }
+        return days;
     }
 
     /**
@@ -69,13 +125,16 @@ public class SlotService {
      */
     @Transactional(readOnly = true)
     public SlotDto nearest(Long serviceId, Long doctorId, LocalDateTime from) {
+        return nearest(serviceId, doctorId, from, isPatient());
+    }
+
+    @Transactional(readOnly = true)
+    public SlotDto nearest(Long serviceId, Long doctorId, LocalDateTime from, boolean selfService) {
         ClinicService service = catalog.find(serviceId);
-        List<Doctor> candidates = doctorId != null
-                ? List.of(doctors.findById(doctorId).orElseThrow(() -> ApiException.notFound("Врач не найден")))
-                : doctors.findAllWithDetails();
+        List<Doctor> candidates = candidates(doctorId);
         ClinicSettings settings = clinic.current();
         LocalDateTime now = LocalDateTime.now();
-        LocalDateTime earliest = earliestStart(settings, now);
+        LocalDateTime earliest = earliestStart(settings, now, selfService);
         LocalDateTime notBefore = from == null || from.isBefore(earliest) ? earliest : from;
         LocalDate lastDay = settings.lastBookableDay(now.toLocalDate());
         Set<LocalDate> holidays = clinic.holidayDates(notBefore.toLocalDate(), lastDay);
@@ -100,9 +159,19 @@ public class SlotService {
                 + settings.getBookingHorizonDays() + " дн. вперёд)");
     }
 
-    /** Пациент записывается сам не раньше чем за min_lead_hours до приёма; персонал — на любое будущее время. */
-    private static LocalDateTime earliestStart(ClinicSettings settings, LocalDateTime now) {
-        return CurrentUser.get().is(Role.PATIENT) ? now.plusHours(settings.getMinLeadHours()) : now;
+    /** Клиент записывается сам не раньше чем за min_lead_hours до приёма; персонал — на любое будущее время. */
+    private static LocalDateTime earliestStart(ClinicSettings settings, LocalDateTime now, boolean selfService) {
+        return selfService ? now.plusHours(settings.getMinLeadHours()) : now;
+    }
+
+    private static boolean isPatient() {
+        return CurrentUser.get().is(Role.PATIENT);
+    }
+
+    private List<Doctor> candidates(Long doctorId) {
+        return doctorId != null
+                ? List.of(doctors.findById(doctorId).orElseThrow(() -> ApiException.notFound("Врач не найден")))
+                : doctors.findAllWithDetails();
     }
 
     private List<SlotDto> slotsFor(Doctor doctor, ClinicService service, LocalDate date,

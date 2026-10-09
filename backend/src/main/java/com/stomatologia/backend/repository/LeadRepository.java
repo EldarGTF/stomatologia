@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
 import java.time.LocalDateTime;
 import java.util.Collection;
+import java.util.Optional;
 
 public interface LeadRepository extends JpaRepository<Lead, Long>, JpaSpecificationExecutor<Lead> {
 
@@ -15,4 +16,8 @@ public interface LeadRepository extends JpaRepository<Lead, Long>, JpaSpecificat
     long countByStatusIn(Collection<LeadStatus> statuses);
 
     long countByCreatedAtGreaterThanEqualAndStatus(LocalDateTime from, LeadStatus status);
+
+    long countByStatusAndConfirmedAtIsNull(LeadStatus status);
+
+    Optional<Lead> findByPublicToken(String publicToken);
 }

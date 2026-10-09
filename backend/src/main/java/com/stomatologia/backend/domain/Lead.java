@@ -84,11 +84,23 @@ public class Lead {
     @Column(length = 300)
     private String rejectReason;
 
+    /** Секрет из ссылки, по которой клиент открывает свою онлайн-запись, скачивает талон и отменяет её. */
+    @Column(length = 64, unique = true)
+    private String publicToken;
+
+    /** Когда регистратор подтвердил запись; у онлайн-записи null до звонка клиенту. */
+    private LocalDateTime confirmedAt;
+
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
     @Column(nullable = false)
     private LocalDateTime updatedAt = LocalDateTime.now();
+
+    /** Онлайн-запись создана, но регистратор её ещё не подтвердил. */
+    public boolean awaitsConfirmation() {
+        return status == LeadStatus.BOOKED && confirmedAt == null;
+    }
 
     @PreUpdate
     void touch() {

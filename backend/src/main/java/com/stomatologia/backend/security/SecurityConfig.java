@@ -31,9 +31,11 @@ public class SecurityConfig {
                 .formLogin(AbstractHttpConfigurer::disable)
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/login", "/actuator/health", "/error",
+                        .requestMatchers("/api/auth/login", "/api/public/**", "/actuator/health", "/error",
                                 "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
-                        .anyRequest().authenticated())
+                        .requestMatchers("/api/**", "/actuator/**").authenticated()
+                        // Всё остальное — статические файлы и страницы сайта онлайн-записи
+                        .anyRequest().permitAll())
                 .exceptionHandling(e -> e
                         .authenticationEntryPoint((req, res, ex) ->
                                 write(res, mapper, HttpServletResponse.SC_UNAUTHORIZED, "Требуется вход в систему"))

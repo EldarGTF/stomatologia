@@ -10,6 +10,11 @@ out/
 .DS_Store
 Thumbs.db
 
+# Сайт онлайн-записи: зависимости, Node.js от frontend-maven-plugin и сборка
+web/node/
+web/node_modules/
+web/dist/
+
 .env
 .env.*
 !.env.example

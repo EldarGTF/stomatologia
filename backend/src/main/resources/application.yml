@@ -27,6 +27,10 @@ app:
     secret: ${JWT_SECRET:dev-only-secret-key-change-me-0123456789abcdef}
     expiration-hours: 8
   demo-data: ${DEMO_DATA:true}
+  # Лимиты публичного API сайта онлайн-записи с одного IP-адреса
+  public-api:
+    reads-per-minute: 120
+    writes-per-hour: 10
 
 management:
   endpoints:

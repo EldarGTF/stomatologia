@@ -248,11 +248,34 @@ class LeadServiceTest {
                 inv.<LocalDateTime>getArgument(0).isBefore(todayStart) ? 20L : 3L);
         when(leads.countByCreatedAtGreaterThanEqualAndStatus(any(), eq(LeadStatus.BOOKED))).thenReturn(7L);
         when(leads.countByStatusIn(LeadStatus.OPEN)).thenReturn(4L);
+        when(leads.countByStatusAndConfirmedAtIsNull(LeadStatus.BOOKED)).thenReturn(2L);
 
         LeadStats stats = service.stats();
 
         assertThat(stats.conversionPercent()).isEqualTo(35);
         assertThat(stats.newToday()).isEqualTo(3);
-        assertThat(stats.open()).isEqualTo(4);
+        assertThat(stats.open()).isEqualTo(6);
+    }
+
+    @Test
+    void onlineBookingIsConfirmedByRegistrar() {
+        lead.setSource(LeadSource.WEBSITE);
+        lead.setStatus(LeadStatus.BOOKED);
+
+        var dto = service.confirm(10L);
+
+        assertThat(lead.getConfirmedAt()).isNotNull();
+        assertThat(lead.getAssignedTo()).isSameAs(registrar);
+        assertThat(dto.awaitsConfirmation()).isFalse();
+        assertThatThrownBy(() -> service.confirm(10L))
+                .satisfies(ex -> assertThat(statusOf(ex)).isEqualTo(HttpStatus.CONFLICT));
+    }
+
+    @Test
+    void bookingByRegistrarIsConfirmedAtOnce() {
+        service.book(10L, newPatient("Сарсенова", "Айгерим"));
+
+        assertThat(lead.getConfirmedAt()).isNotNull();
+        assertThat(lead.awaitsConfirmation()).isFalse();
     }
 }

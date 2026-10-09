@@ -87,7 +87,8 @@ public class LeadService {
             if (f.status() != null) {
                 p.add(cb.equal(root.get("status"), f.status()));
             } else if (f.openOnly()) {
-                p.add(root.get("status").in(LeadStatus.OPEN));
+                p.add(cb.or(root.get("status").in(LeadStatus.OPEN),
+                        cb.and(cb.equal(root.get("status"), LeadStatus.BOOKED), cb.isNull(root.get("confirmedAt")))));
             }
             if (f.source() != null) {
                 p.add(cb.equal(root.get("source"), f.source()));
@@ -206,6 +207,7 @@ public class LeadService {
         l.setPatient(patient);
         l.setAppointment(appointments.getReferenceById(a.id()));
         l.setStatus(LeadStatus.BOOKED);
+        l.setConfirmedAt(LocalDateTime.now());
         if (l.getAssignedTo() == null) {
             l.setAssignedTo(users.getReferenceById(me.id()));
         }
@@ -213,6 +215,24 @@ public class LeadService {
         log.info("Заявка #{} -> запись #{}: пациент {}{}, {} у врача {} ({})", l.getId(), a.id(),
                 patient.getFullName(), r.patientId() == null ? " (новый)" : "", DATE_TIME.format(a.startAt()),
                 a.doctorName(), me.username());
+        return dto(l);
+    }
+
+    /** Регистратор связался с клиентом и подтвердил онлайн-запись. */
+    @Transactional
+    public LeadDto confirm(Long id) {
+        AuthUser me = CurrentUser.get();
+        Lead l = find(id);
+        if (!l.awaitsConfirmation()) {
+            throw ApiException.conflict("Подтвердить можно только онлайн-запись, которая ещё не подтверждена");
+        }
+        l.setConfirmedAt(LocalDateTime.now());
+        if (l.getAssignedTo() == null) {
+            l.setAssignedTo(users.getReferenceById(me.id()));
+        }
+        leads.saveAndFlush(l);
+        log.info("Заявка #{}: онлайн-запись #{} подтверждена ({})", l.getId(),
+                l.getAppointment() != null ? l.getAppointment().getId() : null, me.username());
         return dto(l);
     }
 
@@ -236,7 +256,8 @@ public class LeadService {
         long created = leads.countByCreatedAtGreaterThanEqual(periodStart);
         long booked = leads.countByCreatedAtGreaterThanEqualAndStatus(periodStart, LeadStatus.BOOKED);
         return new LeadStats((int) leads.countByCreatedAtGreaterThanEqual(today.atStartOfDay()),
-                (int) leads.countByStatusIn(LeadStatus.OPEN),
+                (int) (leads.countByStatusIn(LeadStatus.OPEN)
+                        + leads.countByStatusAndConfirmedAtIsNull(LeadStatus.BOOKED)),
                 created == 0 ? 0 : Math.round(booked * 100f / created));
     }
 

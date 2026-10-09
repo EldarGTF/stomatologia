@@ -23,6 +23,12 @@ public final class Phones {
         return phone.trim();
     }
 
+    /** Номер приводится к виду +7XXXXXXXXXX — так проверяется телефон в онлайн-записи. */
+    public static boolean isValid(String phone) {
+        String normalized = normalize(phone);
+        return normalized != null && normalized.matches("\\+7\\d{10}");
+    }
+
     /** Последние 10 цифр номера для поиска совпадений; null, если цифр меньше 10. */
     public static String lastTenDigits(String phone) {
         if (phone == null) {

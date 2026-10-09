@@ -18,6 +18,8 @@
     <name>Стоматология CRM</name>
 
     <modules>
+        <!-- Сайт собирается первым: сервер кладёт готовый web/dist в свои статические файлы -->
+        <module>web</module>
         <module>backend</module>
         <module>client</module>
     </modules>

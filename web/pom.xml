@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.stomatologia</groupId>
+        <artifactId>stomatologia</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>web</artifactId>
+    <packaging>pom</packaging>
+    <name>Стоматология CRM — сайт онлайн-записи</name>
+
+    <properties>
+        <node.version>v24.15.0</node.version>
+        <!-- -Dskip.web=true — собрать сервер и клиент без сайта -->
+        <skip.web>false</skip.web>
+        <skip.web.tests>false</skip.web.tests>
+    </properties>
+
+    <profiles>
+        <profile>
+            <id>skip-web</id>
+            <activation>
+                <property>
+                    <name>skip.web</name>
+                    <value>true</value>
+                </property>
+            </activation>
+            <properties>
+                <skip.web.tests>true</skip.web.tests>
+            </properties>
+        </profile>
+        <profile>
+            <id>skip-tests</id>
+            <activation>
+                <property>
+                    <name>skipTests</name>
+                </property>
+            </activation>
+            <properties>
+                <skip.web.tests>true</skip.web.tests>
+            </properties>
+        </profile>
+    </profiles>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>com.github.eirslett</groupId>
+                <artifactId>frontend-maven-plugin</artifactId>
+                <version>1.15.1</version>
+                <configuration>
+                    <nodeVersion>${node.version}</nodeVersion>
+                    <skip>${skip.web}</skip>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>install-node</id>
+                        <phase>initialize</phase>
+                        <goals>
+                            <goal>install-node-and-npm</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>npm-ci</id>
+                        <phase>initialize</phase>
+                        <goals>
+                            <goal>npm</goal>
+                        </goals>
+                        <configuration>
+                            <arguments>ci --no-audit --no-fund</arguments>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>npm-test</id>
+                        <phase>test</phase>
+                        <goals>
+                            <goal>npm</goal>
+                        </goals>
+                        <configuration>
+                            <arguments>test</arguments>
+                            <skip>${skip.web.tests}</skip>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>npm-build</id>
+                        <phase>compile</phase>
+                        <goals>
+                            <goal>npm</goal>
+                        </goals>
+                        <configuration>
+                            <arguments>run build</arguments>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

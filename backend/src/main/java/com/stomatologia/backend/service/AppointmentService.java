@@ -129,6 +129,20 @@ public class AppointmentService {
             throw ApiException.badRequest("Выберите пациента");
         }
         Patient patient = patients.findById(patientId).orElseThrow(() -> ApiException.notFound("Пациент не найден"));
+        return AppointmentDto.from(book(patient, r, source, me));
+    }
+
+    /**
+     * Запись с сайта: без входа в систему и с теми же ограничениями, что у пациента в личном кабинете
+     * (не позже чем за min_lead_hours до приёма).
+     */
+    @Transactional
+    public Appointment createOnline(Patient patient, AppointmentRequest r) {
+        return book(patient, r, AppointmentSource.WEBSITE, null);
+    }
+
+    /** me == null — запись оформил сам клиент на сайте. */
+    private Appointment book(Patient patient, AppointmentRequest r, AppointmentSource source, AuthUser me) {
         Doctor doctor = findDoctor(r.doctorId());
         ClinicService service = findActiveService(r.serviceId());
 
@@ -141,17 +155,17 @@ public class AppointmentService {
         a.setEndAt(r.startAt().plusMinutes(service.getDurationMinutes()));
         a.setNotes(trimToNull(r.notes()));
         a.setSource(source);
-        a.setCreatedBy(users.getReferenceById(me.id()));
-        ensureBookable(a, null);
+        a.setCreatedBy(me == null ? null : users.getReferenceById(me.id()));
+        ensureBookable(a, null, selfService(me));
 
         appointments.saveAndFlush(a);
         writeAudit(a, AuditAction.CREATE, null, describe(a), me);
         log.info("Запись #{} создана: пациент {}, {}, источник «{}» (оформил {})", a.getId(), patient.getFullName(),
-                describe(a), source.title(), me.username());
+                describe(a), source.title(), me == null ? "клиент на сайте" : me.username());
         if (clinic.current().requiresPrepayment(service.getPrice())) {
             invoices.onBookedWithPrepayment(a);
         }
-        return AppointmentDto.from(a);
+        return a;
     }
 
     /**
@@ -216,6 +230,19 @@ public class AppointmentService {
         checkCanModify(a, me);
         requireScheduled(a, "отменить");
         checkPatientDeadline(a, me, "Отменить");
+        return AppointmentDto.from(doCancel(a, reason, me));
+    }
+
+    /** Отмена клиентом по ссылке из онлайн-записи — с тем же сроком отмены, что в личном кабинете. */
+    @Transactional
+    public Appointment cancelOnline(Long id, String reason) {
+        Appointment a = find(id);
+        requireScheduled(a, "отменить");
+        checkSelfServiceDeadline(a, "Отменить");
+        return doCancel(a, reason, null);
+    }
+
+    private Appointment doCancel(Appointment a, String reason, AuthUser me) {
         a.setStatus(AppointmentStatus.CANCELLED);
         appointments.saveAndFlush(a);
         invoices.onClosedWithoutVisit(a);
@@ -223,8 +250,8 @@ public class AppointmentService {
         writeAudit(a, AuditAction.CANCEL, AppointmentStatus.SCHEDULED.title(),
                 AppointmentStatus.CANCELLED.title() + (why != null ? ". Причина: " + why : ""), me);
         log.info("Запись #{} отменена, время освобождено: {} (отменил {}, причина: {})", a.getId(), describe(a),
-                me.username(), why != null ? why : "не указана");
-        return AppointmentDto.from(a);
+                me == null ? "клиент на сайте" : me.username(), why != null ? why : "не указана");
+        return a;
     }
 
     @Transactional
@@ -266,6 +293,11 @@ public class AppointmentService {
      * и для врача, время в графике, врач, кабинет и пациент свободны.
      */
     void ensureBookable(Appointment a, Long excludeId) {
+        ensureBookable(a, excludeId, selfService(CurrentUser.get()));
+    }
+
+    /** selfService — клиент записывается сам (личный кабинет или сайт), действует минимальное время до приёма. */
+    void ensureBookable(Appointment a, Long excludeId, boolean selfService) {
         LocalDateTime start = a.getStartAt();
         LocalDateTime end = a.getEndAt();
         LocalDateTime now = LocalDateTime.now();
@@ -284,7 +316,7 @@ public class AppointmentService {
         clinic.holiday(start.toLocalDate()).ifPresent(h -> {
             throw ApiException.badRequest(DATE.format(h.getDay()) + " — нерабочий день клиники («" + h.getName() + "»)");
         });
-        if (CurrentUser.get().is(Role.PATIENT) && start.isBefore(now.plusHours(settings.getMinLeadHours()))) {
+        if (selfService && start.isBefore(now.plusHours(settings.getMinLeadHours()))) {
             throw ApiException.badRequest("Онлайн-запись — не позднее чем за " + settings.getMinLeadHours()
                     + " ч до приёма. На более раннее время запишитесь по телефону " + settings.getPhone());
         }
@@ -355,14 +387,21 @@ public class AppointmentService {
 
     /** Пациент может отменить или перенести запись сам не позднее чем за patient_cancel_hours до приёма. */
     private void checkPatientDeadline(Appointment a, AuthUser me, String verb) {
-        if (!me.is(Role.PATIENT)) {
-            return;
+        if (me.is(Role.PATIENT)) {
+            checkSelfServiceDeadline(a, verb);
         }
+    }
+
+    private void checkSelfServiceDeadline(Appointment a, String verb) {
         ClinicSettings settings = clinic.current();
         if (a.getStartAt().isBefore(LocalDateTime.now().plusHours(settings.getPatientCancelHours()))) {
             throw ApiException.conflict(verb + " запись онлайн можно не позднее чем за "
                     + settings.getPatientCancelHours() + " ч до приёма. Позвоните в клинику: " + settings.getPhone());
         }
+    }
+
+    private static boolean selfService(AuthUser me) {
+        return me == null || me.is(Role.PATIENT);
     }
 
     private void writeAudit(Appointment a, AuditAction action, String oldValue, String newValue, AuthUser me) {

@@ -15,7 +15,14 @@ class LeadsControllerTest {
     private static LeadDto lead(LocalDateTime preferredStart, String preferredText) {
         return new LeadDto(1L, LeadSource.TELEGRAM, LeadStatus.NEW, "Айгерим", null, null, null, null, null,
                 preferredStart, preferredText, null, null, null, null, null, null, null, null,
-                LocalDateTime.now(), LocalDateTime.now(), false);
+                LocalDateTime.now(), LocalDateTime.now(), false, null, false);
+    }
+
+    private static LeadDto booked(boolean awaitsConfirmation) {
+        return new LeadDto(2L, LeadSource.WEBSITE, LeadStatus.BOOKED, "Сайт Тестов", "+77019998877", null, null,
+                null, null, null, null, null, null, null, null, null, null, null, null,
+                LocalDateTime.now(), LocalDateTime.now(), false,
+                awaitsConfirmation ? null : LocalDateTime.now(), awaitsConfirmation);
     }
 
     @Test
@@ -39,5 +46,17 @@ class LeadsControllerTest {
         assertThat(LeadStatus.NEEDS_OPERATOR.open()).isTrue();
         assertThat(LeadStatus.BOOKED.open()).isFalse();
         assertThat(LeadStatus.REJECTED.open()).isFalse();
+    }
+
+    @Test
+    void unconfirmedOnlineBookingStillNeedsAttention() {
+        LeadDto unconfirmed = booked(true);
+        assertThat(unconfirmed.needsAttention()).isTrue();
+        assertThat(unconfirmed.statusTitle()).isEqualTo("Не подтверждена");
+        assertThat(unconfirmed.statusStyle()).isEqualTo("badge-warning");
+
+        LeadDto confirmed = booked(false);
+        assertThat(confirmed.needsAttention()).isFalse();
+        assertThat(confirmed.statusTitle()).isEqualTo("Записан");
     }
 }

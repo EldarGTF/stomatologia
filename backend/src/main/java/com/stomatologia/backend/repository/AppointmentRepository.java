@@ -1,6 +1,7 @@
 package com.stomatologia.backend.repository;
 
 import com.stomatologia.backend.domain.Appointment;
+import com.stomatologia.backend.domain.AppointmentSource;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
@@ -8,9 +9,21 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 
 public interface AppointmentRepository extends JpaRepository<Appointment, Long>, JpaSpecificationExecutor<Appointment> {
+
+    /** Предстоящие запланированные приёмы пациентов из указанного источника — для лимита онлайн-записей. */
+    @Query("""
+            select count(a) from Appointment a
+            where a.patient.id in :patientIds
+              and a.source = :source
+              and a.status = com.stomatologia.backend.domain.AppointmentStatus.SCHEDULED
+              and a.startAt > :now
+            """)
+    long countUpcoming(@Param("patientIds") Collection<Long> patientIds, @Param("source") AppointmentSource source,
+                       @Param("now") LocalDateTime now);
 
     /**
      * Активные (не отменённые) приёмы врача, пересекающиеся с интервалом [start, end).

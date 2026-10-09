@@ -27,4 +27,13 @@ class PhonesTest {
         assertThat(Phones.normalize("  ")).isNull();
         assertThat(Phones.normalize(null)).isNull();
     }
+
+    @Test
+    void onlyFullKazakhstanNumbersAreValidForOnlineBooking() {
+        assertThat(Phones.isValid("8 (701) 555-12-34")).isTrue();
+        assertThat(Phones.isValid("+7 701 555 12 34")).isTrue();
+        assertThat(Phones.isValid("555-12-34")).isFalse();
+        assertThat(Phones.isValid("+49 30 1234567")).isFalse();
+        assertThat(Phones.isValid(null)).isFalse();
+    }
 }

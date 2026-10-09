@@ -22,7 +22,7 @@ public final class LeadDtos {
                           LocalDateTime preferredStart, String preferredText, String summary, LocalDateTime consentAt,
                           Long patientId, String patientName, Long appointmentId, LocalDateTime appointmentStart,
                           String assignedTo, String rejectReason, LocalDateTime createdAt, LocalDateTime updatedAt,
-                          boolean hasConversation) {
+                          boolean hasConversation, LocalDateTime confirmedAt, boolean awaitsConfirmation) {
 
         public static LeadDto from(Lead l, boolean hasConversation) {
             return new LeadDto(l.getId(), l.getSource(), l.getStatus(), l.getName(), l.getPhone(),
@@ -36,7 +36,8 @@ public final class LeadDtos {
                     l.getAppointment() != null ? l.getAppointment().getId() : null,
                     l.getAppointment() != null ? l.getAppointment().getStartAt() : null,
                     l.getAssignedTo() != null ? l.getAssignedTo().getFullName() : null,
-                    l.getRejectReason(), l.getCreatedAt(), l.getUpdatedAt(), hasConversation);
+                    l.getRejectReason(), l.getCreatedAt(), l.getUpdatedAt(), hasConversation,
+                    l.getConfirmedAt(), l.awaitsConfirmation());
         }
     }
 

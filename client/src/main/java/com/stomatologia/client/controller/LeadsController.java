@@ -122,7 +122,7 @@ public class LeadsController {
                 Comparator.comparing(LeadDto::name), 180).setMinWidth(150);
         Tables.text(table, "Услуга", LeadDto::serviceName, 170);
         Tables.text(table, "Желаемое время", LeadsController::preferred, 140);
-        Tables.badge(table, "Статус", l -> l.status().title(), l -> l.status().styleClass(), 125).setMinWidth(120);
+        Tables.badge(table, "Статус", LeadDto::statusTitle, LeadDto::statusStyle, 140).setMinWidth(135);
         Tables.init(table, "Заявок нет");
         SortedList<LeadDto> sorted = new SortedList<>(filtered);
         sorted.comparatorProperty().bind(table.comparatorProperty());
@@ -171,7 +171,7 @@ public class LeadsController {
         String digits = q.replaceAll("\\D", "");
         filtered.setPredicate(l -> q.isEmpty() || l.name().toLowerCase().contains(q)
                 || (digits.length() >= 3 && l.phone() != null && l.phone().replaceAll("\\D", "").contains(digits)));
-        long open = leads.stream().filter(l -> l.status().open()).count();
+        long open = leads.stream().filter(LeadDto::needsAttention).count();
         countLabel.setText("Показано: " + filtered.size() + " из " + leads.size()
                 + (statusFilter.getValue() == OPEN ? "" : " · ждут обработки: " + open));
     }
@@ -212,7 +212,7 @@ public class LeadsController {
         Label number = new Label("Заявка №" + l.id());
         number.getStyleClass().add("muted");
         HBox badges = new HBox(6, badge(l.source().title(), l.source().styleClass()),
-                badge(l.status().title(), l.status().styleClass()));
+                badge(l.statusTitle(), l.statusStyle()));
         badges.setAlignment(Pos.CENTER_LEFT);
         detailBox.getChildren().addAll(new VBox(2, name, number), badges);
 
@@ -233,6 +233,8 @@ public class LeadsController {
         if (l.status() == LeadStatus.BOOKED) {
             row = infoRow(info, row, "Пациент", l.patientName());
             row = infoRow(info, row, "Приём", Formats.dateTime(l.appointmentStart()));
+            row = infoRow(info, row, "Подтверждена", l.awaitsConfirmation()
+                    ? "нет — позвоните клиенту и подтвердите запись" : Formats.dateTime(l.confirmedAt()));
         }
         if (l.status() == LeadStatus.REJECTED) {
             infoRow(info, row, "Причина отказа", l.rejectReason());
@@ -297,6 +299,12 @@ public class LeadsController {
             buttons.add(button("Вернуть в работу", () -> Fx.async(() -> ApiClient.get()
                     .post("/api/leads/" + l.id() + "/reopen", null, LeadDto.class), this::reloadSelecting)));
         } else if (l.status() == LeadStatus.BOOKED) {
+            if (l.awaitsConfirmation()) {
+                Button confirm = button("Подтвердить запись", () -> Fx.async(() -> ApiClient.get()
+                        .post("/api/leads/" + l.id() + "/confirm", null, LeadDto.class), this::reloadSelecting));
+                confirm.getStyleClass().add("primary");
+                buttons.add(confirm);
+            }
             buttons.add(button("Открыть приёмы", () -> MainController.navigate(Screen.APPOINTMENTS)));
         }
         FlowPane pane = new FlowPane(8, 8);

@@ -83,6 +83,11 @@ public class LeadController {
         return leadService.reopen(id);
     }
 
+    @PostMapping("/{id}/confirm")
+    public LeadDto confirm(@PathVariable Long id) {
+        return leadService.confirm(id);
+    }
+
     @PostMapping("/{id}/book")
     public LeadDto book(@PathVariable Long id, @Valid @RequestBody LeadBookRequest request) {
         return leadService.book(id, request);

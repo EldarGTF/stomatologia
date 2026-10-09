@@ -2,6 +2,7 @@ package com.stomatologia.backend.service;
 
 import com.stomatologia.backend.common.ApiException;
 import com.stomatologia.backend.domain.Appointment;
+import com.stomatologia.backend.domain.AppointmentSource;
 import com.stomatologia.backend.domain.AppointmentStatus;
 import com.stomatologia.backend.domain.AuditAction;
 import com.stomatologia.backend.domain.ClinicService;
@@ -323,6 +324,61 @@ class AppointmentServiceTest {
             when(patients.findById(PATIENT_ID)).thenReturn(Optional.of(patient));
             when(doctors.findById(DOCTOR_ID)).thenReturn(Optional.of(doctor));
             when(catalog.find(5L)).thenReturn(treatment);
+        }
+    }
+
+    @Nested
+    @DisplayName("Онлайн-запись с сайта без входа в систему")
+    class Online {
+
+        @BeforeEach
+        void anonymous() {
+            SecurityContextHolder.clearContext();
+            when(doctors.findById(DOCTOR_ID)).thenReturn(Optional.of(doctor));
+            when(catalog.find(5L)).thenReturn(treatment);
+        }
+
+        @Test
+        void bookingFromWebsiteNeedsNoUser() {
+            Appointment a = service.createOnline(patient,
+                    new AppointmentRequest(PATIENT_ID, DOCTOR_ID, 5L, nextWeek, "Болит зуб"));
+
+            assertThat(a.getSource()).isEqualTo(AppointmentSource.WEBSITE);
+            assertThat(a.getCreatedBy()).isNull();
+            assertThat(a.getPatient()).isSameAs(patient);
+            verify(audit).save(any());
+        }
+
+        @Test
+        void websiteFollowsMinimumLeadTimeLikePatient() {
+            settings.setMinLeadHours(48);
+
+            assertThatThrownBy(() -> service.createOnline(patient,
+                    new AppointmentRequest(PATIENT_ID, DOCTOR_ID, 5L, tomorrow, null)))
+                    .hasMessageContaining("не позднее чем за 48 ч");
+        }
+
+        @Test
+        void cancelByLinkFreesTheSlot() {
+            Appointment a = appointment(nextWeek);
+            when(appointments.findById(1L)).thenReturn(Optional.of(a));
+
+            service.cancelOnline(1L, "Клиент отменил запись на сайте");
+
+            assertThat(a.getStatus()).isEqualTo(AppointmentStatus.CANCELLED);
+            verify(invoices).onClosedWithoutVisit(a);
+        }
+
+        @Test
+        void cancelByLinkFollowsCancellationDeadline() {
+            settings.setPatientCancelHours(24);
+            Appointment a = appointment(LocalDateTime.now().plusHours(3));
+            when(appointments.findById(1L)).thenReturn(Optional.of(a));
+
+            assertThatThrownBy(() -> service.cancelOnline(1L, null))
+                    .hasMessageContaining("не позднее чем за 24 ч")
+                    .satisfies(ex -> assertThat(statusOf(ex)).isEqualTo(HttpStatus.CONFLICT));
+            assertThat(a.getStatus()).isEqualTo(AppointmentStatus.SCHEDULED);
         }
     }
 
