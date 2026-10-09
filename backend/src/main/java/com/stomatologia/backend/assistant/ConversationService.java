@@ -69,7 +69,7 @@ public class ConversationService {
 
     public ConversationService(ChatModel model, AssistantTools tools, ConversationStore store,
                                PublicCatalogService catalog, List<ChatGateway> gateways,
-                               @Value("${app.assistant.history-messages:20}") int historyMessages,
+                               @Value("${app.assistant.history-messages:30}") int historyMessages,
                                @Value("${app.assistant.daily-messages-per-chat:60}") int dailyMessagesPerChat) {
         this.model = model;
         this.tools = tools;
@@ -128,14 +128,7 @@ public class ConversationService {
         ChatState chat = store.state(conversationId);
         ClinicInfo clinic = catalog.clinic();
         String system = AssistantPrompt.build(clinic, chat, LocalDateTime.now());
-        List<ModelMessage> messages = new ArrayList<>();
-        for (ChatMessage m : store.history(conversationId, historyMessages)) {
-            messages.add(switch (m.getRole()) {
-                case USER -> new UserText(m.getText());
-                case ASSISTANT -> AssistantTurn.text(m.getText());
-                case OPERATOR -> AssistantTurn.text("Администратор: " + m.getText());
-            });
-        }
+        List<ModelMessage> messages = history(conversationId);
         boolean booked = chat.appointmentStart() != null;
         boolean searched = false;
         boolean corrected = false;
@@ -158,7 +151,8 @@ public class ConversationService {
                 messages.add(new UserText(falseBooking ? NOT_BOOKED : NOT_SEARCHED));
                 continue;
             }
-            messages.add(new AssistantTurn(reply.text(), reply.toolCalls()));
+            AssistantTurn turn = new AssistantTurn(reply.text(), reply.toolCalls());
+            messages.add(turn);
             List<ToolResult> results = new ArrayList<>();
             for (ToolCall call : reply.toolCalls()) {
                 log.info("Разговор #{}: инструмент {} {}", conversationId, call.name(), call.input());
@@ -168,9 +162,30 @@ public class ConversationService {
                 results.add(result);
             }
             messages.add(new ToolResults(results));
+            store.saveReply(conversationId, MessageRole.TOOL, ToolTurns.write(turn, results), null);
         }
         log.warn("Разговор #{}: модель вызвала инструменты {} раз подряд без ответа", conversationId, MAX_TOOL_STEPS);
         return null;
+    }
+
+    /**
+     * Переписка текущей заявки так, как её видела модель, вместе с ходами инструментов. Начинается
+     * с сообщения клиента: обрезанный по лимиту ход с инструментом API не примет.
+     */
+    private List<ModelMessage> history(Long conversationId) {
+        List<ModelMessage> messages = new ArrayList<>();
+        for (ChatMessage m : store.history(conversationId, historyMessages)) {
+            if (messages.isEmpty() && m.getRole() != MessageRole.USER) {
+                continue;
+            }
+            switch (m.getRole()) {
+                case USER -> messages.add(new UserText(m.getText()));
+                case ASSISTANT -> messages.add(AssistantTurn.text(m.getText()));
+                case OPERATOR -> messages.add(AssistantTurn.text("Администратор: " + m.getText()));
+                case TOOL -> messages.addAll(ToolTurns.read(m.getText()));
+            }
+        }
+        return messages;
     }
 
     private Reply handOff(Received in, String reason) {

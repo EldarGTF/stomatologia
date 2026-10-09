@@ -16,7 +16,7 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
 
     @Query("""
             select m from ChatMessage m left join fetch m.author
-            where m.lead.id = :leadId
+            where m.lead.id = :leadId and m.role <> com.stomatologia.backend.domain.MessageRole.TOOL
             order by m.sentAt, m.id
             """)
     List<ChatMessage> findByLeadId(@Param("leadId") Long leadId);
@@ -30,7 +30,7 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
 
     Optional<ChatMessage> findFirstByLeadIdOrderByIdDesc(Long leadId);
 
-    List<ChatMessage> findByLeadIdAndIdGreaterThanOrderById(Long leadId, Long afterId);
+    List<ChatMessage> findByLeadIdAndRoleNotAndIdGreaterThanOrderById(Long leadId, MessageRole role, Long afterId);
 
     long countByConversationIdAndRoleAndSentAtGreaterThanEqual(Long conversationId, MessageRole role,
                                                                LocalDateTime since);

@@ -247,6 +247,48 @@ class ConversationServiceTest {
     }
 
     @Test
+    void toolTurnIsSavedForNextMessages() throws Exception {
+        ToolCall call = new ToolCall("toolu_1", "list_services", mapper.readTree("{}"));
+        when(model.reply(anyString(), anyList(), anyList()))
+                .thenReturn(new ModelReply("", List.of(call)))
+                .thenReturn(new ModelReply("Чистка стоит 15 000 ₸.", List.of()));
+        when(tools.execute(call, 7L)).thenReturn(new ToolResult("toolu_1", "[{\"name\":\"Чистка\"}]", false));
+
+        send("Сколько стоит чистка?");
+
+        ArgumentCaptor<String> saved = ArgumentCaptor.forClass(String.class);
+        verify(store).saveReply(eq(7L), eq(MessageRole.TOOL), saved.capture(), isNull());
+        assertThat(ToolTurns.read(saved.getValue())).hasSize(2);
+    }
+
+    @Test
+    void earlierToolResultsAreShownToModel() throws Exception {
+        ToolCall call = new ToolCall("toolu_1", "find_free_slots", mapper.readTree("{\"service\":\"Лечение кариеса\"}"));
+        String turn = ToolTurns.write(new ChatModel.AssistantTurn(null, List.of(call)),
+                List.of(new ToolResult("toolu_1", "{\"slots\":[\"15:00\"]}", false)));
+        when(store.history(7L, 20)).thenReturn(List.of(
+                message(MessageRole.TOOL, turn),
+                message(MessageRole.ASSISTANT, "Есть 15:00"),
+                message(MessageRole.USER, "Запишите на кариес"),
+                message(MessageRole.TOOL, turn),
+                message(MessageRole.ASSISTANT, "Есть 15:00. Подходит?"),
+                message(MessageRole.USER, "Да")));
+        List<List<ModelMessage>> seen = new ArrayList<>();
+        when(model.reply(anyString(), anyList(), anyList())).thenAnswer(inv -> {
+            seen.add(List.copyOf(inv.getArgument(1)));
+            return new ModelReply("Как вас зовут?", List.of());
+        });
+
+        send("Да");
+
+        List<ModelMessage> history = seen.get(0);
+        assertThat(history.get(0)).isEqualTo(new UserText("Запишите на кариес"));
+        assertThat(history.get(1)).isEqualTo(new ChatModel.AssistantTurn(null, List.of(call)));
+        assertThat(history.get(2)).isInstanceOf(ToolResults.class);
+        assertThat(history).hasSize(5);
+    }
+
+    @Test
     void operatorMessagesAreShownToModelAsAdministrator() {
         when(store.history(7L, 20)).thenReturn(List.of(message(MessageRole.USER, "Можно в субботу?"),
                 message(MessageRole.OPERATOR, "Да, до 14:00"), message(MessageRole.USER, "Спасибо")));

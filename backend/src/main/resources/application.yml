@@ -44,7 +44,7 @@ app:
     base-url: https://api.anthropic.com
     max-tokens: 1024
     timeout-seconds: 40
-    history-messages: 20
+    history-messages: 30
     daily-messages-per-chat: 60
   # Telegram-бот включается, когда задан токен от @BotFather
   telegram:

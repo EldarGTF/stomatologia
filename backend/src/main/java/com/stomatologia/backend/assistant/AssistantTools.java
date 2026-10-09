@@ -8,6 +8,8 @@ import com.stomatologia.backend.assistant.ChatModel.ToolResult;
 import com.stomatologia.backend.assistant.ChatModel.ToolSpec;
 import com.stomatologia.backend.assistant.ConversationStore.ChatState;
 import com.stomatologia.backend.common.ApiException;
+import com.stomatologia.backend.domain.ChatMessage;
+import com.stomatologia.backend.domain.MessageRole;
 import com.stomatologia.backend.dto.AppointmentDtos.SlotDto;
 import com.stomatologia.backend.dto.PublicDtos.BookingInfo;
 import com.stomatologia.backend.dto.PublicDtos.BookingRequest;
@@ -58,6 +60,7 @@ public class AssistantTools {
     static final int SLOTS_PER_DAY = 8;
     static final int DAYS_TO_SUGGEST = 3;
     static final int SEARCH_DAYS = 30;
+    private static final int CONSENT_LOOKBACK = 30;
     private static final String SERVICE_HINT = "название услуги точно как в list_services, например «Лечение кариеса»";
 
     private final PublicCatalogService catalog;
@@ -254,9 +257,7 @@ public class AssistantTools {
         if (phone == null) {
             throw new ToolInputException("Не указан телефон — спроси номер у клиента");
         }
-        if (!in.path("consent").asBoolean(false)) {
-            throw new ToolInputException("Нет согласия на обработку персональных данных — спроси клиента");
-        }
+        requireConsent(in, conversationId);
         BookingRequest r = new BookingRequest(service(in, true).id(), doctorId(in),
                 requiredDateTime(in, "start"), requiredText(in, "last_name", 60), requiredText(in, "first_name", 60),
                 phone, cut(optionalText(in, "comment"), 500), true, null);
@@ -281,9 +282,7 @@ public class AssistantTools {
     }
 
     private Map<String, Object> createLead(JsonNode in, Long conversationId) {
-        if (!in.path("consent").asBoolean(false)) {
-            throw new ToolInputException("Нет согласия на обработку персональных данных — спроси клиента");
-        }
+        requireConsent(in, conversationId);
         ChatState chat = store.state(conversationId);
         String phone = optionalText(in, "phone");
         if (phone == null && chat.clientPhone() == null) {
@@ -295,6 +294,34 @@ public class AssistantTools {
                 requiredText(in, "summary", 2000));
         return Map.of("lead_created", true, "lead_id", leadId,
                 "next", "Администратор перезвонит в рабочее время");
+    }
+
+    /**
+     * Флаг consent ставит модель, поэтому он засчитывается, только если в этом обращении бот уже спросил
+     * клиента о согласии на обработку персональных данных и клиент ответил после вопроса.
+     */
+    private void requireConsent(JsonNode in, Long conversationId) {
+        if (!in.path("consent").asBoolean(false)) {
+            throw new ToolInputException("Нет согласия на обработку персональных данных — спроси клиента");
+        }
+        if (!consentAsked(store.history(conversationId, CONSENT_LOOKBACK))) {
+            throw new ToolInputException("Клиента ещё не спрашивали о согласии на обработку персональных данных. "
+                    + "Повтори детали и спроси: «Записываю? Подтвердите также согласие на обработку "
+                    + "персональных данных». Вызови инструмент снова только после ответа клиента.");
+        }
+    }
+
+    static boolean consentAsked(List<ChatMessage> history) {
+        boolean asked = false;
+        for (ChatMessage m : history) {
+            if (m.getRole() == MessageRole.ASSISTANT && m.getText() != null
+                    && m.getText().toLowerCase(RU).contains("персональн")) {
+                asked = true;
+            } else if (asked && m.getRole() == MessageRole.USER) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private Map<String, Object> handoff(JsonNode in, Long conversationId) {

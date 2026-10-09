@@ -9,9 +9,11 @@ import com.stomatologia.backend.assistant.ConversationStore.ChatState;
 import com.stomatologia.backend.common.ApiException;
 import com.stomatologia.backend.domain.AppointmentStatus;
 import com.stomatologia.backend.domain.ChatChannel;
+import com.stomatologia.backend.domain.ChatMessage;
 import com.stomatologia.backend.domain.ConversationMode;
 import com.stomatologia.backend.domain.Lead;
 import com.stomatologia.backend.domain.LeadSource;
+import com.stomatologia.backend.domain.MessageRole;
 import com.stomatologia.backend.dto.AppointmentDtos.SlotDto;
 import com.stomatologia.backend.dto.PublicDtos.BookingInfo;
 import com.stomatologia.backend.dto.PublicDtos.BookingRequest;
@@ -37,6 +39,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -72,6 +75,17 @@ class AssistantToolsTest {
         when(catalog.doctors()).thenReturn(List.of(
                 new DoctorInfo(2L, "Иванова Елена Петровна", "Терапевт", "101"),
                 new DoctorInfo(3L, "Петров Андрей Викторович", "Стоматолог-хирург", "102")));
+        when(store.history(eq(7L), anyInt())).thenReturn(List.of(
+                message(MessageRole.USER, "Хочу на кариес"),
+                message(MessageRole.ASSISTANT, "Записываю? Подтвердите также согласие на обработку персональных данных"),
+                message(MessageRole.USER, "Да")));
+    }
+
+    private static ChatMessage message(MessageRole role, String text) {
+        ChatMessage m = new ChatMessage();
+        m.setRole(role);
+        m.setText(text);
+        return m;
     }
 
     private static ChatState chat(String phone, Long leadId) {
@@ -200,6 +214,35 @@ class AssistantToolsTest {
         assertThat(r.error()).isTrue();
         assertThat(r.content()).contains("согласия");
         verify(booking, never()).book(any(), any(), any());
+    }
+
+    @Test
+    void consentFlagWithoutQuestionToClientIsRefused() throws Exception {
+        when(store.history(eq(7L), anyInt())).thenReturn(List.of(
+                message(MessageRole.ASSISTANT, "Напишите имя и телефон"),
+                message(MessageRole.USER, "Иванов Иван, +77011234567")));
+
+        ToolResult booking = run("book_appointment", """
+                {"service":"Лечение кариеса","start":"2030-01-10T10:00","last_name":"Иванов","first_name":"Иван",
+                 "phone":"+77011234567","consent":true}""");
+        ToolResult lead = run("create_lead", """
+                {"name":"Иван","phone":"+77011234567","summary":"Перезвонить","consent":true}""");
+
+        assertThat(booking.error()).isTrue();
+        assertThat(booking.content()).contains("Подтвердите также согласие");
+        assertThat(lead.error()).isTrue();
+        verify(this.booking, never()).book(any(), any(), any());
+        verify(store, never()).callbackLead(anyLong(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void consentCountsOnlyWhenClientAnsweredTheQuestion() {
+        ChatMessage question = message(MessageRole.ASSISTANT, "Подтвердите согласие на обработку Персональных данных");
+
+        assertThat(AssistantTools.consentAsked(List.of(question))).isFalse();
+        assertThat(AssistantTools.consentAsked(List.of(question, message(MessageRole.USER, "Согласен")))).isTrue();
+        assertThat(AssistantTools.consentAsked(List.of(message(MessageRole.USER, "Согласен на обработку персональных данных"),
+                message(MessageRole.ASSISTANT, "Хорошо")))).isFalse();
     }
 
     @Test

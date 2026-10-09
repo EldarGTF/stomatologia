@@ -213,7 +213,8 @@ public class ConversationStore {
         return conversations.findFirstByChannelAndExternalChatIdAndModeNotOrderByIdDesc(channel, chatId,
                         ConversationMode.CLOSED)
                 .filter(c -> c.getLead() != null)
-                .map(c -> messages.findByLeadIdAndIdGreaterThanOrderById(c.getLead().getId(), afterId))
+                .map(c -> messages.findByLeadIdAndRoleNotAndIdGreaterThanOrderById(c.getLead().getId(),
+                        MessageRole.TOOL, afterId))
                 .orElse(List.of());
     }
 
