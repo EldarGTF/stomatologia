@@ -32,6 +32,11 @@ public class ChatMessage {
     @JoinColumn(name = "conversation_id")
     private Conversation conversation;
 
+    /** Заявка, в рамках которой написано сообщение. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "lead_id")
+    private Lead lead;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private MessageRole role;

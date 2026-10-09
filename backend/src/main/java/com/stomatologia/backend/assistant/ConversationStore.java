@@ -20,6 +20,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -35,6 +36,8 @@ public class ConversationStore {
 
     private static final Logger log = LogManager.getLogger(ConversationStore.class);
     private static final DateTimeFormatter DATE_TIME = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm");
+    /** Сколько после записи сообщения ещё относятся к ней («спасибо», «как вас найти»). */
+    static final Duration FOLLOW_UP = Duration.ofHours(2);
 
     private final ConversationRepository conversations;
     private final ChatMessageRepository messages;
@@ -66,9 +69,9 @@ public class ConversationStore {
         if (c.getClientName() == null && clientName != null && !clientName.isBlank()) {
             c.setClientName(cut(clientName.trim(), 100));
         }
-        if (c.getLead() == null) {
+        if (startsNewLead(c)) {
             Lead l = openLead(c);
-            l.setSummary("Написал в " + c.getChannel().title() + ": " + cut(text, 300));
+            l.setSummary(appendLine(l.getSummary(), "Написал в " + c.getChannel().title() + ": " + cut(text, 300)));
             leads.saveAndFlush(l);
             c.setLead(l);
             log.info("Разговор #{} ({}): новая заявка #{}", c.getId(), c.getChannel().title(), l.getId());
@@ -97,11 +100,14 @@ public class ConversationStore {
         return save(find(conversationId), role, text, authorId).getId();
     }
 
-    /** Последние limit сообщений в хронологическом порядке. */
+    /** Последние limit сообщений текущей заявки разговора в хронологическом порядке. */
     @Transactional(readOnly = true)
     public List<ChatMessage> history(Long conversationId, int limit) {
-        List<ChatMessage> list = new ArrayList<>(
-                messages.findByConversationIdOrderByIdDesc(conversationId, PageRequest.of(0, limit)));
+        Lead l = find(conversationId).getLead();
+        if (l == null) {
+            return List.of();
+        }
+        List<ChatMessage> list = new ArrayList<>(messages.findByLeadIdOrderByIdDesc(l.getId(), PageRequest.of(0, limit)));
         Collections.reverse(list);
         return list;
     }
@@ -201,12 +207,13 @@ public class ConversationStore {
         log.info("Заявка #{}: разговор возвращён ИИ-менеджеру ({})", leadId, username);
     }
 
-    /** Новые сообщения открытого разговора в чате сайта — для опроса виджетом. */
+    /** Новые сообщения текущей заявки разговора в чате сайта — для опроса виджетом. */
     @Transactional(readOnly = true)
     public List<ChatMessage> messagesAfter(ChatChannel channel, String chatId, long afterId) {
         return conversations.findFirstByChannelAndExternalChatIdAndModeNotOrderByIdDesc(channel, chatId,
                         ConversationMode.CLOSED)
-                .map(c -> messages.findByConversationIdAndIdGreaterThanOrderById(c.getId(), afterId))
+                .filter(c -> c.getLead() != null)
+                .map(c -> messages.findByLeadIdAndIdGreaterThanOrderById(c.getLead().getId(), afterId))
                 .orElse(List.of());
     }
 
@@ -228,6 +235,18 @@ public class ConversationStore {
         });
     }
 
+    /**
+     * Сообщение начинает новую заявку, если её ещё нет, прежнюю отклонили или клиент уже записан и пишет
+     * не сразу после записи — с одного устройства или Telegram со временем приходят разные обращения.
+     */
+    private static boolean startsNewLead(Conversation c) {
+        Lead l = c.getLead();
+        if (l == null || l.getStatus() == LeadStatus.REJECTED) {
+            return true;
+        }
+        return !l.getStatus().isOpen() && c.getLastMessageAt().isBefore(LocalDateTime.now().minus(FOLLOW_UP));
+    }
+
     /** Открытая заявка разговора или новая, если её нет либо она уже закрыта. */
     private Lead openLead(Conversation c) {
         Lead l = c.getLead();
@@ -240,14 +259,9 @@ public class ConversationStore {
         fresh.setName(c.getClientName() != null ? c.getClientName()
                 : c.getChannel() == ChatChannel.WEB_CHAT ? "Посетитель сайта" : "Клиент из " + c.getChannel().title());
         fresh.setPhone(c.getClientPhone());
-        if (l != null && l.getPatient() != null) {
-            fresh.setPatient(l.getPatient());
-            fresh.setPhone(fresh.getPhone() != null ? fresh.getPhone() : l.getPhone());
-            fresh.setName(l.getName());
-            if (l.getAppointment() != null) {
-                fresh.setSummary("Уже записан на " + DATE_TIME.format(l.getAppointment().getStartAt())
-                        + " (заявка #" + l.getId() + ")");
-            }
+        if (l != null && l.getAppointment() != null && l.getAppointment().getStartAt().isAfter(LocalDateTime.now())) {
+            fresh.setSummary("Из этого чата уже записан " + l.getName() + " на "
+                    + DATE_TIME.format(l.getAppointment().getStartAt()) + " (заявка #" + l.getId() + ")");
         }
         return fresh;
     }
@@ -260,6 +274,7 @@ public class ConversationStore {
     private ChatMessage save(Conversation c, MessageRole role, String text, Long authorId) {
         ChatMessage m = new ChatMessage();
         m.setConversation(c);
+        m.setLead(c.getLead());
         m.setRole(role);
         m.setText(text);
         m.setAuthor(authorId == null ? null : users.getReferenceById(authorId));

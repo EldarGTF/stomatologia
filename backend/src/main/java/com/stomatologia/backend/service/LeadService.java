@@ -2,6 +2,7 @@ package com.stomatologia.backend.service;
 
 import com.stomatologia.backend.common.ApiException;
 import com.stomatologia.backend.common.Phones;
+import com.stomatologia.backend.domain.ChatMessage;
 import com.stomatologia.backend.domain.Conversation;
 import com.stomatologia.backend.domain.Lead;
 import com.stomatologia.backend.domain.LeadSource;
@@ -116,9 +117,13 @@ public class LeadService {
         List<Lead> list = leads.findAll(spec, Sort.by(Sort.Direction.DESC, "createdAt"));
         Map<Long, Conversation> chats = new HashMap<>();
         if (!list.isEmpty()) {
-            for (Conversation c : conversations.findByLeadIds(list.stream().map(Lead::getId).toList())) {
+            List<Long> ids = list.stream().map(Lead::getId).toList();
+            for (Conversation c : conversations.findByLeadIds(ids)) {
                 chats.merge(c.getLead().getId(), c,
                         (a, b) -> a.getLastMessageAt().isAfter(b.getLastMessageAt()) ? a : b);
+            }
+            for (Object[] row : messages.findConversationsByLeadIds(ids)) {
+                chats.putIfAbsent((Long) row[0], (Conversation) row[1]);
             }
         }
         return list.stream().map(l -> LeadDto.from(l, chats.get(l.getId()))).toList();
@@ -301,8 +306,13 @@ public class LeadService {
     }
 
     LeadDto dto(Lead l) {
-        return LeadDto.from(l, l.getId() == null ? null
-                : conversations.findFirstByLeadIdOrderByLastMessageAtDesc(l.getId()).orElse(null));
+        if (l.getId() == null) {
+            return LeadDto.from(l, null);
+        }
+        Conversation c = conversations.findFirstByLeadIdOrderByLastMessageAtDesc(l.getId())
+                .orElseGet(() -> messages.findFirstByLeadIdOrderByIdDesc(l.getId())
+                        .map(ChatMessage::getConversation).orElse(null));
+        return LeadDto.from(l, c);
     }
 
     Lead find(Long id) {

@@ -8,21 +8,29 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> {
 
     @Query("""
             select m from ChatMessage m left join fetch m.author
-            where m.conversation.lead.id = :leadId
+            where m.lead.id = :leadId
             order by m.sentAt, m.id
             """)
     List<ChatMessage> findByLeadId(@Param("leadId") Long leadId);
 
-    /** Последние сообщения разговора, новые первыми: история для модели. */
-    List<ChatMessage> findByConversationIdOrderByIdDesc(Long conversationId, Pageable page);
+    /** Последние сообщения заявки, новые первыми: история для модели. */
+    List<ChatMessage> findByLeadIdOrderByIdDesc(Long leadId, Pageable page);
 
-    List<ChatMessage> findByConversationIdAndIdGreaterThanOrderById(Long conversationId, Long afterId);
+    /** Пары «заявка — разговор», в которых у заявки есть сообщения. */
+    @Query("select distinct m.lead.id, m.conversation from ChatMessage m where m.lead.id in :leadIds")
+    List<Object[]> findConversationsByLeadIds(@Param("leadIds") Collection<Long> leadIds);
+
+    Optional<ChatMessage> findFirstByLeadIdOrderByIdDesc(Long leadId);
+
+    List<ChatMessage> findByLeadIdAndIdGreaterThanOrderById(Long leadId, Long afterId);
 
     long countByConversationIdAndRoleAndSentAtGreaterThanEqual(Long conversationId, MessageRole role,
                                                                LocalDateTime since);

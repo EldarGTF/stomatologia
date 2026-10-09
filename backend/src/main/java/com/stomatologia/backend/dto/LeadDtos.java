@@ -28,8 +28,13 @@ public final class LeadDtos {
                           boolean hasConversation, LocalDateTime confirmedAt, boolean awaitsConfirmation,
                           ChatChannel conversationChannel, ConversationMode conversationMode) {
 
-        /** c — последний разговор по заявке или null. */
+        /**
+         * c — разговор, в котором есть переписка заявки, или null. Если разговор уже перешёл к другой заявке,
+         * для этой он закрыт: ответить из её карточки нельзя.
+         */
         public static LeadDto from(Lead l, Conversation c) {
+            boolean current = c != null && c.getLead() != null && l.getId().equals(c.getLead().getId());
+            ConversationMode mode = c == null ? null : current ? c.getMode() : ConversationMode.CLOSED;
             return new LeadDto(l.getId(), l.getSource(), l.getStatus(), l.getName(), l.getPhone(),
                     l.getService() != null ? l.getService().getId() : null,
                     l.getService() != null ? l.getService().getName() : null,
@@ -43,7 +48,7 @@ public final class LeadDtos {
                     l.getAssignedTo() != null ? l.getAssignedTo().getFullName() : null,
                     l.getRejectReason(), l.getCreatedAt(), l.getUpdatedAt(), c != null,
                     l.getConfirmedAt(), l.awaitsConfirmation(),
-                    c != null ? c.getChannel() : null, c != null ? c.getMode() : null);
+                    c != null ? c.getChannel() : null, mode);
         }
     }
 
